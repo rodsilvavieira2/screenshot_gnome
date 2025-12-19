@@ -301,37 +301,6 @@ fn build_ui(app: &adw::Application) {
         }
     });
 
-    // --- Color indicator and picker ---
-    let color_indicator = gtk::DrawingArea::builder()
-        .width_request(24)
-        .height_request(24)
-        .tooltip_text("Current Color")
-        .build();
-
-    color_indicator.set_draw_func({
-        let state = state.clone();
-        move |_, cr, width, height| {
-            let state = state.borrow();
-            let color = state.editor.current_color();
-
-            // Draw color swatch
-            cr.set_source_rgba(
-                color.red() as f64,
-                color.green() as f64,
-                color.blue() as f64,
-                color.alpha() as f64,
-            );
-            cr.rectangle(0.0, 0.0, width as f64, height as f64);
-            let _ = cr.fill();
-
-            // Draw border
-            cr.set_source_rgb(0.5, 0.5, 0.5);
-            cr.set_line_width(1.0);
-            cr.rectangle(0.0, 0.0, width as f64, height as f64);
-            let _ = cr.stroke();
-        }
-    });
-
     // Color chooser dialog button
     let color_button = gtk::ColorDialogButton::builder()
         .dialog(&gtk::ColorDialog::new())
@@ -339,13 +308,46 @@ fn build_ui(app: &adw::Application) {
         .tooltip_text("Select Color")
         .build();
 
+    // Color picker circle
+    let color_picker_circle = gtk::DrawingArea::builder()
+        .width_request(20)
+        .height_request(20)
+        .build();
+
+    color_picker_circle.set_draw_func({
+        let state = state.clone();
+        move |_, cr, width, height| {
+            let state = state.borrow();
+            let color = state.editor.current_color();
+
+            // Draw circle
+            cr.arc(
+                width as f64 / 2.0,
+                height as f64 / 2.0,
+                (width as f64 / 2.0) - 2.0,
+                0.0,
+                2.0 * std::f64::consts::PI,
+            );
+            cr.set_source_rgba(
+                color.red() as f64,
+                color.green() as f64,
+                color.blue() as f64,
+                color.alpha() as f64,
+            );
+            let _ = cr.fill_preserve();
+            cr.set_source_rgb(0.0, 0.0, 0.0);
+            cr.set_line_width(1.0);
+            let _ = cr.stroke();
+        }
+    });
+
     color_button.connect_rgba_notify({
         let state = state.clone();
-        let color_indicator = color_indicator.clone();
+        let color_picker_circle = color_picker_circle.clone();
         move |btn| {
             let color = btn.rgba();
             state.borrow_mut().editor.set_color(color);
-            color_indicator.queue_draw();
+            color_picker_circle.queue_draw();
         }
     });
 
@@ -396,19 +398,21 @@ fn build_ui(app: &adw::Application) {
         .build();
     tool_text_btn.add_css_class("flat");
 
-    let tool_colorpicker_btn = gtk::ToggleButton::builder()
-        .icon_name("color-select-symbolic")
-        .tooltip_text("Pick Color")
-        .group(&tool_pointer_btn)
+    let tool_buttons_box = gtk::Box::builder()
+        .orientation(Orientation::Horizontal)
+        .spacing(6)
+        .homogeneous(true)
         .build();
-    tool_colorpicker_btn.add_css_class("flat");
+    tool_buttons_box.add_css_class("tool-buttons");
 
-    tools_box.append(&tool_pointer_btn);
-    tools_box.append(&tool_pencil_btn);
-    tools_box.append(&tool_rectangle_btn);
-    tools_box.append(&tool_crop_btn);
-    tools_box.append(&tool_text_btn);
-    tools_box.append(&tool_colorpicker_btn);
+    tool_buttons_box.append(&tool_pointer_btn);
+    tool_buttons_box.append(&tool_pencil_btn);
+    tool_buttons_box.append(&tool_rectangle_btn);
+    tool_buttons_box.append(&tool_crop_btn);
+    tool_buttons_box.append(&tool_text_btn);
+    tool_buttons_box.append(&color_button);
+
+    tools_box.append(&tool_buttons_box);
 
     // Separator
     let separator = gtk::Separator::builder()
@@ -416,12 +420,8 @@ fn build_ui(app: &adw::Application) {
         .margin_start(6)
         .margin_end(6)
         .build();
-    separator.add_css_class("spacer");
-    tools_box.append(&separator);
 
-    // Color controls
-    tools_box.append(&color_indicator);
-    tools_box.append(&color_button);
+    separator.add_css_class("spacer");
 
     // Separator
     let separator2 = gtk::Separator::builder()
@@ -429,8 +429,8 @@ fn build_ui(app: &adw::Application) {
         .margin_start(6)
         .margin_end(6)
         .build();
+
     separator2.add_css_class("spacer");
-    tools_box.append(&separator2);
 
     // Undo button
     let undo_btn = gtk::Button::builder()
@@ -616,21 +616,6 @@ fn build_ui(app: &adw::Application) {
                 let mut s = state.borrow_mut();
                 s.editor.set_tool(EditorTool::Text);
                 s.is_crop_mode = false;
-            }
-        }
-    });
-
-    tool_colorpicker_btn.connect_toggled({
-        let state = state.clone();
-        let picked_color_label = picked_color_label.clone();
-        move |btn| {
-            if btn.is_active() {
-                let mut s = state.borrow_mut();
-                s.editor.set_tool(EditorTool::ColorPicker);
-                s.is_crop_mode = false;
-                picked_color_label.set_visible(true);
-            } else {
-                picked_color_label.set_visible(false);
             }
         }
     });
@@ -847,7 +832,6 @@ fn build_ui(app: &adw::Application) {
         let drawing_area = drawing_area.clone();
         let picked_color_label = picked_color_label.clone();
         let color_button = color_button.clone();
-        let color_indicator = color_indicator.clone();
         let text_popover = text_popover.clone();
         let text_entry = text_entry.clone();
         move |_, _, x, y| {
@@ -875,7 +859,7 @@ fn build_ui(app: &adw::Application) {
                             // Update UI
                             picked_color_label.set_text(&format!("Color: {}", hex));
                             color_button.set_rgba(&color);
-                            color_indicator.queue_draw();
+                            color_picker_circle.queue_draw();
                             drawing_area.queue_draw();
                         }
                     }
