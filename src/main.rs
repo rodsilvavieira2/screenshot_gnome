@@ -2,14 +2,19 @@ use gtk4 as gtk;
 use libadwaita as adw;
 
 use adw::prelude::*;
-use gtk::{Align, DrawingArea, GestureDrag, Orientation};
+use gtk::{Align, DrawingArea, GestureClick, GestureDrag, Orientation};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
 mod capture;
+mod editor;
 
 use capture::{capture_primary_monitor, capture_window_by_index, list_capturable_windows};
+use editor::{
+    Annotation, ClipboardManager, EditorState, EditorTool, FreeDrawAnnotation, RectangleAnnotation,
+    pick_color_from_pixbuf,
+};
 
 const APP_ID: &str = "org.example.ScreenshotGnome";
 
@@ -44,9 +49,12 @@ struct AppState {
     original_screenshot: Option<gtk::gdk_pixbuf::Pixbuf>,
     final_image: Option<gtk::gdk_pixbuf::Pixbuf>,
     selection: Option<Selection>,
-    is_active: bool, // Overlay active
+    is_active: bool, // Overlay active (for selection mode capture)
     monitor_x: i32,
     monitor_y: i32,
+    // Editor state
+    editor: EditorState,
+    is_crop_mode: bool, // Separate crop mode from capture selection
 }
 
 fn main() {
@@ -65,6 +73,8 @@ fn build_ui(app: &adw::Application) {
         is_active: false,
         monitor_x: 0,
         monitor_y: 0,
+        editor: EditorState::new(),
+        is_crop_mode: false,
     }));
 
     // --- Header Bar ---
@@ -170,19 +180,20 @@ fn build_ui(app: &adw::Application) {
     drawing_area.set_draw_func({
         let state = state.clone();
         move |_, cr, width, height| {
-            let state = state.borrow();
+            let mut state = state.borrow_mut();
 
             // Background
             cr.set_source_rgb(0.14, 0.14, 0.14);
             cr.paint().expect("Invalid cairo surface state");
 
-            let image_to_draw = if state.is_active {
-                state.original_screenshot.as_ref()
+            // Clone the pixbuf to avoid borrow issues
+            let pixbuf_opt = if state.is_active {
+                state.original_screenshot.clone()
             } else {
-                state.final_image.as_ref()
+                state.final_image.clone()
             };
 
-            if let Some(pixbuf) = image_to_draw {
+            if let Some(pixbuf) = pixbuf_opt {
                 let da_width = width as f64;
                 let da_height = height as f64;
                 let img_width = pixbuf.width() as f64;
@@ -204,14 +215,19 @@ fn build_ui(app: &adw::Application) {
                     (da_height - img_height * scale) / 2.0
                 };
 
+                // Update editor display transform
+                state
+                    .editor
+                    .update_display_transform(scale, offset_x, offset_y);
+
                 cr.save().expect("Failed to save cairo context");
                 cr.translate(offset_x, offset_y);
                 cr.scale(scale, scale);
-                cr.set_source_pixbuf(pixbuf, 0.0, 0.0);
+                cr.set_source_pixbuf(&pixbuf, 0.0, 0.0);
                 cr.paint().expect("Failed to paint pixbuf");
                 cr.restore().expect("Failed to restore cairo context");
 
-                // Draw Selection Overlay only if cropping
+                // Draw Selection Overlay only if in capture selection mode
                 if state.is_active && state.mode == CaptureMode::Selection {
                     if let Some(sel) = state.selection {
                         let rect = sel.rectangle();
@@ -239,7 +255,97 @@ fn build_ui(app: &adw::Application) {
                         cr.stroke().expect("Failed to stroke selection border");
                     }
                 }
+
+                // Draw crop overlay when in crop mode
+                if state.is_crop_mode {
+                    if let Some((x, y, w, h)) = state.editor.tool_state.get_drag_rect() {
+                        // Dimming outside crop area
+                        let (dx, dy) = state.editor.image_to_display_coords(x, y);
+                        let dw = w * scale;
+                        let dh = h * scale;
+
+                        cr.set_source_rgba(0.0, 0.0, 0.0, 0.5);
+                        // Top
+                        cr.rectangle(0.0, 0.0, da_width, dy);
+                        // Bottom
+                        cr.rectangle(0.0, dy + dh, da_width, da_height - (dy + dh));
+                        // Left
+                        cr.rectangle(0.0, dy, dx, dh);
+                        // Right
+                        cr.rectangle(dx + dw, dy, da_width - (dx + dw), dh);
+                        let _ = cr.fill();
+
+                        // Border
+                        cr.set_source_rgb(1.0, 1.0, 1.0);
+                        cr.set_line_width(2.0);
+                        cr.rectangle(dx, dy, dw, dh);
+                        let _ = cr.stroke();
+                    }
+                }
+
+                // Draw annotations (only when not in capture selection mode)
+                if !state.is_active {
+                    state.editor.draw_annotations(cr);
+                }
+
+                // Draw pending text cursor
+                if let Some(ref pending) = state.editor.pending_text {
+                    let (dx, dy) = state.editor.image_to_display_coords(pending.x, pending.y);
+                    cr.set_source_rgba(1.0, 1.0, 1.0, 0.8);
+                    cr.set_line_width(2.0);
+                    cr.move_to(dx, dy - 20.0);
+                    cr.line_to(dx, dy + 5.0);
+                    let _ = cr.stroke();
+                }
             }
+        }
+    });
+
+    // --- Color indicator and picker ---
+    let color_indicator = gtk::DrawingArea::builder()
+        .width_request(24)
+        .height_request(24)
+        .tooltip_text("Current Color")
+        .build();
+
+    color_indicator.set_draw_func({
+        let state = state.clone();
+        move |_, cr, width, height| {
+            let state = state.borrow();
+            let color = state.editor.current_color();
+
+            // Draw color swatch
+            cr.set_source_rgba(
+                color.red() as f64,
+                color.green() as f64,
+                color.blue() as f64,
+                color.alpha() as f64,
+            );
+            cr.rectangle(0.0, 0.0, width as f64, height as f64);
+            let _ = cr.fill();
+
+            // Draw border
+            cr.set_source_rgb(0.5, 0.5, 0.5);
+            cr.set_line_width(1.0);
+            cr.rectangle(0.0, 0.0, width as f64, height as f64);
+            let _ = cr.stroke();
+        }
+    });
+
+    // Color chooser dialog button
+    let color_button = gtk::ColorDialogButton::builder()
+        .dialog(&gtk::ColorDialog::new())
+        .rgba(&gtk::gdk::RGBA::new(1.0, 0.0, 0.0, 1.0))
+        .tooltip_text("Select Color")
+        .build();
+
+    color_button.connect_rgba_notify({
+        let state = state.clone();
+        let color_indicator = color_indicator.clone();
+        move |btn| {
+            let color = btn.rgba();
+            state.borrow_mut().editor.set_color(color);
+            color_indicator.queue_draw();
         }
     });
 
@@ -254,21 +360,57 @@ fn build_ui(app: &adw::Application) {
     tools_box.add_css_class("osd");
     tools_box.add_css_class("toolbar");
 
-    let tool_icons = [
-        "input-mouse-symbolic",
-        "document-edit-symbolic",
-        "system-search-symbolic",
-        "zoom-fit-best-symbolic",
-        "crop-symbolic",
-        "media-playback-stop-symbolic",
-        "insert-text-symbolic",
-        "color-select-symbolic",
-    ];
-    for icon in tool_icons {
-        let btn = gtk::Button::builder().icon_name(icon).build();
-        btn.add_css_class("flat");
-        tools_box.append(&btn);
-    }
+    // Tool buttons
+    let tool_pointer_btn = gtk::ToggleButton::builder()
+        .icon_name("input-mouse-symbolic")
+        .tooltip_text("Pointer")
+        .active(true)
+        .build();
+    tool_pointer_btn.add_css_class("flat");
+
+    let tool_pencil_btn = gtk::ToggleButton::builder()
+        .icon_name("document-edit-symbolic")
+        .tooltip_text("Free Draw")
+        .group(&tool_pointer_btn)
+        .build();
+    tool_pencil_btn.add_css_class("flat");
+
+    let tool_rectangle_btn = gtk::ToggleButton::builder()
+        .icon_name("media-playback-stop-symbolic")
+        .tooltip_text("Rectangle")
+        .group(&tool_pointer_btn)
+        .build();
+    tool_rectangle_btn.add_css_class("flat");
+
+    let tool_crop_btn = gtk::ToggleButton::builder()
+        .icon_name("crop-symbolic")
+        .tooltip_text("Crop")
+        .group(&tool_pointer_btn)
+        .build();
+    tool_crop_btn.add_css_class("flat");
+
+    let tool_text_btn = gtk::ToggleButton::builder()
+        .icon_name("insert-text-symbolic")
+        .tooltip_text("Add Text")
+        .group(&tool_pointer_btn)
+        .build();
+    tool_text_btn.add_css_class("flat");
+
+    let tool_colorpicker_btn = gtk::ToggleButton::builder()
+        .icon_name("color-select-symbolic")
+        .tooltip_text("Pick Color")
+        .group(&tool_pointer_btn)
+        .build();
+    tool_colorpicker_btn.add_css_class("flat");
+
+    tools_box.append(&tool_pointer_btn);
+    tools_box.append(&tool_pencil_btn);
+    tools_box.append(&tool_rectangle_btn);
+    tools_box.append(&tool_crop_btn);
+    tools_box.append(&tool_text_btn);
+    tools_box.append(&tool_colorpicker_btn);
+
+    // Separator
     let separator = gtk::Separator::builder()
         .orientation(Orientation::Vertical)
         .margin_start(6)
@@ -276,9 +418,40 @@ fn build_ui(app: &adw::Application) {
         .build();
     separator.add_css_class("spacer");
     tools_box.append(&separator);
+
+    // Color controls
+    tools_box.append(&color_indicator);
+    tools_box.append(&color_button);
+
+    // Separator
+    let separator2 = gtk::Separator::builder()
+        .orientation(Orientation::Vertical)
+        .margin_start(6)
+        .margin_end(6)
+        .build();
+    separator2.add_css_class("spacer");
+    tools_box.append(&separator2);
+
+    // Undo button
+    let undo_btn = gtk::Button::builder()
+        .icon_name("edit-undo-symbolic")
+        .tooltip_text("Undo")
+        .build();
+    undo_btn.add_css_class("flat");
+    tools_box.append(&undo_btn);
+
+    // Copy to clipboard button
+    let copy_btn = gtk::Button::builder()
+        .icon_name("edit-copy-symbolic")
+        .tooltip_text("Copy to Clipboard")
+        .build();
+    copy_btn.add_css_class("flat");
+    tools_box.append(&copy_btn);
+
+    // Save button
     let save_btn = gtk::Button::builder()
-        .label("Save")
         .icon_name("document-save-symbolic")
+        .tooltip_text("Save")
         .build();
     save_btn.add_css_class("suggested-action");
     tools_box.append(&save_btn);
@@ -303,12 +476,57 @@ fn build_ui(app: &adw::Application) {
 
     let confirm_btn = gtk::Button::builder()
         .icon_name("object-select-symbolic")
-        .tooltip_text("Confirm Crop")
+        .tooltip_text("Confirm")
         .build();
     confirm_btn.add_css_class("suggested-action");
 
     crop_tools_box.append(&cancel_btn);
     crop_tools_box.append(&confirm_btn);
+
+    // --- Text Input Popover ---
+    let text_entry = gtk::Entry::builder()
+        .placeholder_text("Enter text...")
+        .width_chars(20)
+        .build();
+
+    let text_confirm_btn = gtk::Button::builder()
+        .icon_name("object-select-symbolic")
+        .tooltip_text("Add Text")
+        .build();
+    text_confirm_btn.add_css_class("suggested-action");
+
+    let text_cancel_btn = gtk::Button::builder()
+        .icon_name("process-stop-symbolic")
+        .tooltip_text("Cancel")
+        .build();
+
+    let text_input_box = gtk::Box::builder()
+        .orientation(Orientation::Horizontal)
+        .spacing(6)
+        .margin_top(6)
+        .margin_bottom(6)
+        .margin_start(6)
+        .margin_end(6)
+        .build();
+    text_input_box.append(&text_entry);
+    text_input_box.append(&text_confirm_btn);
+    text_input_box.append(&text_cancel_btn);
+
+    let text_popover = gtk::Popover::builder()
+        .child(&text_input_box)
+        .autohide(false)
+        .build();
+    text_popover.set_parent(&drawing_area);
+
+    // --- Picked Color Display ---
+    let picked_color_label = gtk::Label::builder()
+        .label("")
+        .halign(Align::Center)
+        .valign(Align::Start)
+        .margin_top(12)
+        .visible(false)
+        .build();
+    picked_color_label.add_css_class("osd");
 
     // --- Placeholder ---
     let placeholder_icon = gtk::Image::builder()
@@ -324,6 +542,7 @@ fn build_ui(app: &adw::Application) {
     overlay.add_overlay(&placeholder_icon);
     overlay.add_overlay(&tools_box);
     overlay.add_overlay(&crop_tools_box);
+    overlay.add_overlay(&picked_color_label);
 
     let content = gtk::Box::builder()
         .orientation(Orientation::Vertical)
@@ -339,17 +558,120 @@ fn build_ui(app: &adw::Application) {
         .default_height(600)
         .build();
 
-    // --- Logic ---
+    // --- Tool Button Connections ---
 
-    // Drag Controller
+    tool_pointer_btn.connect_toggled({
+        let state = state.clone();
+        move |btn| {
+            if btn.is_active() {
+                let mut s = state.borrow_mut();
+                s.editor.set_tool(EditorTool::Pointer);
+                s.is_crop_mode = false;
+            }
+        }
+    });
+
+    tool_pencil_btn.connect_toggled({
+        let state = state.clone();
+        move |btn| {
+            if btn.is_active() {
+                let mut s = state.borrow_mut();
+                s.editor.set_tool(EditorTool::Pencil);
+                s.is_crop_mode = false;
+            }
+        }
+    });
+
+    tool_rectangle_btn.connect_toggled({
+        let state = state.clone();
+        move |btn| {
+            if btn.is_active() {
+                let mut s = state.borrow_mut();
+                s.editor.set_tool(EditorTool::Rectangle);
+                s.is_crop_mode = false;
+            }
+        }
+    });
+
+    tool_crop_btn.connect_toggled({
+        let state = state.clone();
+        let tools_box = tools_box.clone();
+        let crop_tools_box = crop_tools_box.clone();
+        move |btn| {
+            if btn.is_active() {
+                let mut s = state.borrow_mut();
+                s.editor.set_tool(EditorTool::Crop);
+                s.is_crop_mode = true;
+                drop(s);
+                tools_box.set_visible(false);
+                crop_tools_box.set_visible(true);
+            }
+        }
+    });
+
+    tool_text_btn.connect_toggled({
+        let state = state.clone();
+        move |btn| {
+            if btn.is_active() {
+                let mut s = state.borrow_mut();
+                s.editor.set_tool(EditorTool::Text);
+                s.is_crop_mode = false;
+            }
+        }
+    });
+
+    tool_colorpicker_btn.connect_toggled({
+        let state = state.clone();
+        let picked_color_label = picked_color_label.clone();
+        move |btn| {
+            if btn.is_active() {
+                let mut s = state.borrow_mut();
+                s.editor.set_tool(EditorTool::ColorPicker);
+                s.is_crop_mode = false;
+                picked_color_label.set_visible(true);
+            } else {
+                picked_color_label.set_visible(false);
+            }
+        }
+    });
+
+    // --- Undo Button ---
+    undo_btn.connect_clicked({
+        let state = state.clone();
+        let drawing_area = drawing_area.clone();
+        move |_| {
+            let mut s = state.borrow_mut();
+            s.editor.undo();
+            drop(s);
+            drawing_area.queue_draw();
+        }
+    });
+
+    // --- Copy to Clipboard Button ---
+    copy_btn.connect_clicked({
+        let state = state.clone();
+        let window = window.clone();
+        move |_| {
+            let s = state.borrow();
+            if let Some(ref pixbuf) = s.final_image {
+                let clipboard_manager = ClipboardManager::from_widget(&window);
+                if clipboard_manager.copy_image(pixbuf).is_ok() {
+                    println!("Image copied to clipboard");
+                }
+            }
+        }
+    });
+
+    // --- Drag Controller for Drawing ---
     let drag = GestureDrag::new();
 
-    // Drag Begin
     drag.connect_drag_begin({
         let state = state.clone();
         let drawing_area = drawing_area.clone();
         move |_, x, y| {
             let mut s = state.borrow_mut();
+
+            // Handle capture selection mode
             if s.is_active && s.mode == CaptureMode::Selection {
                 s.selection = Some(Selection {
                     start_x: x,
@@ -357,46 +679,277 @@ fn build_ui(app: &adw::Application) {
                     end_x: x,
                     end_y: y,
                 });
+                drop(s);
+                drawing_area.queue_draw();
+                return;
+            }
+
+            // Handle editor tools
+            if s.final_image.is_some() {
+                let tool = s.editor.current_tool();
+                match tool {
+                    EditorTool::Pencil => {
+                        let (img_x, img_y) = s.editor.display_to_image_coords(x, y);
+                        s.editor.tool_state.start_drag(img_x, img_y);
+                        let mut free_draw = FreeDrawAnnotation::new(
+                            s.editor.tool_state.color,
+                            s.editor.tool_state.line_width,
+                        );
+                        free_draw.add_point(img_x, img_y);
+                        s.editor
+                            .annotations
+                            .set_current(Some(Annotation::FreeDraw(free_draw)));
+                    }
+                    EditorTool::Rectangle => {
+                        let (img_x, img_y) = s.editor.display_to_image_coords(x, y);
+                        s.editor.tool_state.start_drag(img_x, img_y);
+                    }
+                    EditorTool::Crop => {
+                        let (img_x, img_y) = s.editor.display_to_image_coords(x, y);
+                        s.editor.tool_state.start_drag(img_x, img_y);
+                    }
+                    _ => {}
+                }
+                drop(s);
                 drawing_area.queue_draw();
             }
         }
     });
 
-    // Drag Update
     drag.connect_drag_update({
         let state = state.clone();
         let drawing_area = drawing_area.clone();
-        move |_, x, y| {
+        move |gesture, offset_x, offset_y| {
             let mut s = state.borrow_mut();
+
+            // Handle capture selection mode
             if s.is_active && s.mode == CaptureMode::Selection {
                 if let Some(sel) = &mut s.selection {
-                    sel.end_x = sel.start_x + x;
-                    sel.end_y = sel.start_y + y;
+                    sel.end_x = sel.start_x + offset_x;
+                    sel.end_y = sel.start_y + offset_y;
+                    drop(s);
                     drawing_area.queue_draw();
                 }
+                return;
+            }
+
+            // Handle editor tools
+            if s.final_image.is_some() {
+                let tool = s.editor.current_tool();
+
+                if let Some((start_x, start_y)) = gesture.start_point() {
+                    let current_x = start_x + offset_x;
+                    let current_y = start_y + offset_y;
+                    let (img_x, img_y) = s.editor.display_to_image_coords(current_x, current_y);
+
+                    match tool {
+                        EditorTool::Pencil => {
+                            s.editor.tool_state.update_drag(img_x, img_y);
+                            if let Some(Annotation::FreeDraw(ref draw)) =
+                                s.editor.annotations.current().cloned()
+                            {
+                                let mut draw = draw.clone();
+                                draw.add_point(img_x, img_y);
+                                s.editor
+                                    .annotations
+                                    .set_current(Some(Annotation::FreeDraw(draw)));
+                            }
+                        }
+                        EditorTool::Rectangle => {
+                            s.editor.tool_state.update_drag(img_x, img_y);
+                            if let (Some((start_x, start_y)), Some((end_x, end_y))) = (
+                                s.editor.tool_state.drag_start,
+                                s.editor.tool_state.drag_current,
+                            ) {
+                                let rect = RectangleAnnotation::from_corners(
+                                    start_x,
+                                    start_y,
+                                    end_x,
+                                    end_y,
+                                    s.editor.tool_state.color,
+                                    s.editor.tool_state.line_width,
+                                );
+                                s.editor
+                                    .annotations
+                                    .set_current(Some(Annotation::Rectangle(rect)));
+                            }
+                        }
+                        EditorTool::Crop => {
+                            s.editor.tool_state.update_drag(img_x, img_y);
+                        }
+                        _ => {}
+                    }
+                }
+                drop(s);
+                drawing_area.queue_draw();
             }
         }
     });
 
-    // Drag End (Just update selection)
     drag.connect_drag_end({
         let state = state.clone();
         let drawing_area = drawing_area.clone();
-
-        move |_, x, y| {
+        move |gesture, offset_x, offset_y| {
             let mut s = state.borrow_mut();
+
+            // Handle capture selection mode
             if s.is_active && s.mode == CaptureMode::Selection {
                 if let Some(sel) = &mut s.selection {
-                    sel.end_x = sel.start_x + x;
-                    sel.end_y = sel.start_y + y;
+                    sel.end_x = sel.start_x + offset_x;
+                    sel.end_y = sel.start_y + offset_y;
+                    drop(s);
                     drawing_area.queue_draw();
                 }
+                return;
+            }
+
+            // Handle editor tools
+            if s.final_image.is_some() {
+                let tool = s.editor.current_tool();
+
+                if let Some((start_x, start_y)) = gesture.start_point() {
+                    let current_x = start_x + offset_x;
+                    let current_y = start_y + offset_y;
+                    let (img_x, img_y) = s.editor.display_to_image_coords(current_x, current_y);
+
+                    match tool {
+                        EditorTool::Pencil => {
+                            s.editor.tool_state.update_drag(img_x, img_y);
+                            s.editor.annotations.commit_current();
+                            s.editor.tool_state.end_drag();
+                        }
+                        EditorTool::Rectangle => {
+                            s.editor.tool_state.update_drag(img_x, img_y);
+                            s.editor.annotations.commit_current();
+                            s.editor.tool_state.end_drag();
+                        }
+                        EditorTool::Crop => {
+                            // Keep the drag state for crop confirmation
+                            s.editor.tool_state.update_drag(img_x, img_y);
+                        }
+                        _ => {}
+                    }
+                }
+                drop(s);
+                drawing_area.queue_draw();
             }
         }
     });
+
     drawing_area.add_controller(drag);
 
-    // Confirm Crop Action
+    // --- Click Controller for Color Picker and Text ---
+    let click = GestureClick::new();
+    click.set_button(1); // Left click
+
+    click.connect_released({
+        let state = state.clone();
+        let drawing_area = drawing_area.clone();
+        let picked_color_label = picked_color_label.clone();
+        let color_button = color_button.clone();
+        let color_indicator = color_indicator.clone();
+        let text_popover = text_popover.clone();
+        let text_entry = text_entry.clone();
+        move |_, _, x, y| {
+            let mut s = state.borrow_mut();
+
+            if s.final_image.is_none() || s.is_active {
+                return;
+            }
+
+            let tool = s.editor.current_tool();
+
+            match tool {
+                EditorTool::ColorPicker => {
+                    if let Some(ref pixbuf) = s.final_image.clone() {
+                        let (img_x, img_y) = s.editor.display_to_image_coords(x, y);
+                        if let Ok(picked) =
+                            pick_color_from_pixbuf(pixbuf, img_x as i32, img_y as i32)
+                        {
+                            let color = picked.color;
+                            let hex = picked.to_hex();
+                            s.editor.set_color(color);
+                            s.editor.color_picker.set_picked_color(picked);
+                            drop(s);
+
+                            // Update UI
+                            picked_color_label.set_text(&format!("Color: {}", hex));
+                            color_button.set_rgba(&color);
+                            color_indicator.queue_draw();
+                            drawing_area.queue_draw();
+                        }
+                    }
+                }
+                EditorTool::Text => {
+                    let (img_x, img_y) = s.editor.display_to_image_coords(x, y);
+                    s.editor.pending_text = Some(editor::PendingText {
+                        x: img_x,
+                        y: img_y,
+                        text: String::new(),
+                    });
+                    drop(s);
+
+                    // Show text input popover
+                    text_entry.set_text("");
+                    let rect = gtk::gdk::Rectangle::new(x as i32, y as i32, 1, 1);
+                    text_popover.set_pointing_to(Some(&rect));
+                    text_popover.popup();
+                    text_entry.grab_focus();
+
+                    drawing_area.queue_draw();
+                }
+                _ => {}
+            }
+        }
+    });
+
+    drawing_area.add_controller(click);
+
+    // --- Text Input Handling ---
+    text_confirm_btn.connect_clicked({
+        let state = state.clone();
+        let drawing_area = drawing_area.clone();
+        let text_popover = text_popover.clone();
+        let text_entry = text_entry.clone();
+        move |_| {
+            let text = text_entry.text().to_string();
+            let mut s = state.borrow_mut();
+            s.editor.commit_text(text);
+            drop(s);
+            text_popover.popdown();
+            drawing_area.queue_draw();
+        }
+    });
+
+    text_cancel_btn.connect_clicked({
+        let state = state.clone();
+        let drawing_area = drawing_area.clone();
+        let text_popover = text_popover.clone();
+        move |_| {
+            let mut s = state.borrow_mut();
+            s.editor.cancel_text();
+            drop(s);
+            text_popover.popdown();
+            drawing_area.queue_draw();
+        }
+    });
+
+    text_entry.connect_activate({
+        let state = state.clone();
+        let drawing_area = drawing_area.clone();
+        let text_popover = text_popover.clone();
+        let text_entry = text_entry.clone();
+        move |_| {
+            let text = text_entry.text().to_string();
+            let mut s = state.borrow_mut();
+            s.editor.commit_text(text);
+            drop(s);
+            text_popover.popdown();
+            drawing_area.queue_draw();
+        }
+    });
+
+    // --- Crop Confirm/Cancel ---
     confirm_btn.connect_clicked({
         let state = state.clone();
         let drawing_area = drawing_area.clone();
@@ -404,9 +957,12 @@ fn build_ui(app: &adw::Application) {
         let header_bar = header_bar.clone();
         let tools_box = tools_box.clone();
         let crop_tools_box = crop_tools_box.clone();
+        let tool_pointer_btn = tool_pointer_btn.clone();
 
         move |_| {
             let mut s = state.borrow_mut();
+
+            // Check if we're in capture selection mode
             if s.is_active && s.mode == CaptureMode::Selection {
                 if let Some(sel) = s.selection {
                     let rect = sel.rectangle();
@@ -414,7 +970,7 @@ fn build_ui(app: &adw::Application) {
                     // Only crop if area is significant
                     if rect.width() > 10 && rect.height() > 10 {
                         if let Some(orig) = &s.original_screenshot {
-                            // Assuming scale 1.0
+                            // Assuming scale 1.0 for fullscreen capture
                             let crop_x = rect.x().max(0);
                             let crop_y = rect.y().max(0);
                             let crop_w = rect.width().min(orig.width() - crop_x);
@@ -428,9 +984,10 @@ fn build_ui(app: &adw::Application) {
                     }
                 }
 
-                // Exit cropping mode
+                // Exit capture selection mode
                 s.is_active = false;
                 s.selection = None;
+                s.editor.reset();
 
                 // Restore UI
                 window.unfullscreen();
@@ -438,12 +995,43 @@ fn build_ui(app: &adw::Application) {
                 tools_box.set_visible(true);
                 crop_tools_box.set_visible(false);
 
+                drop(s);
+                drawing_area.queue_draw();
+                return;
+            }
+
+            // Handle editor crop mode
+            if s.is_crop_mode {
+                if let Some((x, y, w, h)) = s.editor.tool_state.get_drag_rect() {
+                    if w > 10.0 && h > 10.0 {
+                        if let Some(ref pixbuf) = s.final_image.clone() {
+                            let crop_x = (x as i32).max(0);
+                            let crop_y = (y as i32).max(0);
+                            let crop_w = (w as i32).min(pixbuf.width() - crop_x);
+                            let crop_h = (h as i32).min(pixbuf.height() - crop_y);
+
+                            if crop_w > 0 && crop_h > 0 {
+                                let cropped = pixbuf.new_subpixbuf(crop_x, crop_y, crop_w, crop_h);
+                                s.final_image = Some(cropped);
+                                s.editor.clear_annotations(); // Clear annotations after crop
+                            }
+                        }
+                    }
+                }
+
+                s.is_crop_mode = false;
+                s.editor.tool_state.reset_drag();
+                s.editor.set_tool(EditorTool::Pointer);
+                drop(s);
+
+                tool_pointer_btn.set_active(true);
+                tools_box.set_visible(true);
+                crop_tools_box.set_visible(false);
                 drawing_area.queue_draw();
             }
         }
     });
 
-    // Cancel Crop Action
     cancel_btn.connect_clicked({
         let state = state.clone();
         let drawing_area = drawing_area.clone();
@@ -452,26 +1040,46 @@ fn build_ui(app: &adw::Application) {
         let tools_box = tools_box.clone();
         let crop_tools_box = crop_tools_box.clone();
         let placeholder_icon = placeholder_icon.clone();
+        let tool_pointer_btn = tool_pointer_btn.clone();
 
         move |_| {
             let mut s = state.borrow_mut();
-            s.is_active = false;
-            s.selection = None;
 
-            window.unfullscreen();
-            header_bar.set_visible(true);
-            tools_box.set_visible(true);
-            crop_tools_box.set_visible(false);
+            // Check if we're in capture selection mode
+            if s.is_active {
+                s.is_active = false;
+                s.selection = None;
 
-            if s.final_image.is_none() {
-                placeholder_icon.set_visible(true);
+                window.unfullscreen();
+                header_bar.set_visible(true);
+                tools_box.set_visible(true);
+                crop_tools_box.set_visible(false);
+
+                if s.final_image.is_none() {
+                    placeholder_icon.set_visible(true);
+                }
+
+                drop(s);
+                drawing_area.queue_draw();
+                return;
             }
 
-            drawing_area.queue_draw();
+            // Handle editor crop mode cancel
+            if s.is_crop_mode {
+                s.is_crop_mode = false;
+                s.editor.tool_state.reset_drag();
+                s.editor.set_tool(EditorTool::Pointer);
+                drop(s);
+
+                tool_pointer_btn.set_active(true);
+                tools_box.set_visible(true);
+                crop_tools_box.set_visible(false);
+                drawing_area.queue_draw();
+            }
         }
     });
 
-    // Take Screenshot Action
+    // --- Take Screenshot Action ---
     take_screenshot_btn.connect_clicked({
         let state = state.clone();
         let drawing_area = drawing_area.clone();
@@ -558,6 +1166,7 @@ fn build_ui(app: &adw::Application) {
                             let mut s = state_clone.borrow_mut();
                             s.final_image = Some(result.pixbuf);
                             s.is_active = false;
+                            s.editor.reset();
 
                             placeholder_icon_clone.set_visible(false);
                             drawing_area_clone.queue_draw();
@@ -585,6 +1194,7 @@ fn build_ui(app: &adw::Application) {
                         let mut s = state.borrow_mut();
                         s.monitor_x = result.monitor_info.x;
                         s.monitor_y = result.monitor_info.y;
+                        s.editor.reset();
 
                         if mode == CaptureMode::Screen {
                             s.final_image = Some(result.pixbuf);
