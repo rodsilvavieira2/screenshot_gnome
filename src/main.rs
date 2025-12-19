@@ -6,9 +6,17 @@ use gtk::{Align, DrawingArea, GestureDrag, Orientation};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
-use xcap::Monitor;
+use xcap::{Monitor, Window};
 
 const APP_ID: &str = "org.example.ScreenshotGnome";
+
+#[derive(Default, Clone, Copy, Debug, PartialEq)]
+enum CaptureMode {
+    #[default]
+    Selection,
+    Window,
+    Screen,
+}
 
 #[derive(Default, Clone, Copy, Debug)]
 struct Selection {
@@ -29,10 +37,13 @@ impl Selection {
 }
 
 struct AppState {
+    mode: CaptureMode,
     original_screenshot: Option<gtk::gdk_pixbuf::Pixbuf>,
     final_image: Option<gtk::gdk_pixbuf::Pixbuf>,
     selection: Option<Selection>,
-    is_cropping: bool,
+    is_active: bool, // Overlay active
+    monitor_x: i32,
+    monitor_y: i32,
 }
 
 fn main() {
@@ -44,10 +55,13 @@ fn main() {
 
 fn build_ui(app: &adw::Application) {
     let state = Rc::new(RefCell::new(AppState {
+        mode: CaptureMode::Selection,
         original_screenshot: None,
         final_image: None,
         selection: None,
-        is_cropping: false,
+        is_active: false,
+        monitor_x: 0,
+        monitor_y: 0,
     }));
 
     // --- Header Bar ---
@@ -59,6 +73,7 @@ fn build_ui(app: &adw::Application) {
 
     let mode_label = gtk::Label::new(Some("Mode:"));
     mode_label.add_css_class("dim-label");
+
     let mode_selection = gtk::ToggleButton::builder()
         .label("Selection")
         .active(true)
@@ -71,6 +86,7 @@ fn build_ui(app: &adw::Application) {
         .label("Screen")
         .group(&mode_selection)
         .build();
+
     let mode_box = gtk::Box::builder()
         .orientation(Orientation::Horizontal)
         .build();
@@ -78,6 +94,32 @@ fn build_ui(app: &adw::Application) {
     mode_box.append(&mode_selection);
     mode_box.append(&mode_window);
     mode_box.append(&mode_screen);
+
+    // Connect mode toggles
+    mode_selection.connect_toggled({
+        let state = state.clone();
+        move |btn| {
+            if btn.is_active() {
+                state.borrow_mut().mode = CaptureMode::Selection;
+            }
+        }
+    });
+    mode_window.connect_toggled({
+        let state = state.clone();
+        move |btn| {
+            if btn.is_active() {
+                state.borrow_mut().mode = CaptureMode::Window;
+            }
+        }
+    });
+    mode_screen.connect_toggled({
+        let state = state.clone();
+        move |btn| {
+            if btn.is_active() {
+                state.borrow_mut().mode = CaptureMode::Screen;
+            }
+        }
+    });
 
     let title_box = gtk::Box::builder()
         .orientation(Orientation::Horizontal)
@@ -131,7 +173,7 @@ fn build_ui(app: &adw::Application) {
             cr.set_source_rgb(0.14, 0.14, 0.14);
             cr.paint().expect("Invalid cairo surface state");
 
-            let image_to_draw = if state.is_cropping {
+            let image_to_draw = if state.is_active {
                 state.original_screenshot.as_ref()
             } else {
                 state.final_image.as_ref()
@@ -148,12 +190,12 @@ fn build_ui(app: &adw::Application) {
                 let scale_y = da_height / img_height;
                 let scale = scale_x.min(scale_y);
 
-                let offset_x = if state.is_cropping {
+                let offset_x = if state.is_active {
                     0.0
                 } else {
                     (da_width - img_width * scale) / 2.0
                 };
-                let offset_y = if state.is_cropping {
+                let offset_y = if state.is_active {
                     0.0
                 } else {
                     (da_height - img_height * scale) / 2.0
@@ -167,7 +209,7 @@ fn build_ui(app: &adw::Application) {
                 cr.restore().expect("Failed to restore cairo context");
 
                 // Draw Selection Overlay only if cropping
-                if state.is_cropping {
+                if state.is_active && state.mode == CaptureMode::Selection {
                     if let Some(sel) = state.selection {
                         let rect = sel.rectangle();
                         let rx = rect.x() as f64;
@@ -245,7 +287,7 @@ fn build_ui(app: &adw::Application) {
         .halign(Align::Center)
         .valign(Align::End)
         .margin_bottom(24)
-        .visible(false) // Initially hidden
+        .visible(false)
         .build();
     crop_tools_box.add_css_class("osd");
     crop_tools_box.add_css_class("toolbar");
@@ -305,7 +347,7 @@ fn build_ui(app: &adw::Application) {
         let drawing_area = drawing_area.clone();
         move |_, x, y| {
             let mut s = state.borrow_mut();
-            if s.is_cropping {
+            if s.is_active && s.mode == CaptureMode::Selection {
                 s.selection = Some(Selection {
                     start_x: x,
                     start_y: y,
@@ -323,7 +365,7 @@ fn build_ui(app: &adw::Application) {
         let drawing_area = drawing_area.clone();
         move |_, x, y| {
             let mut s = state.borrow_mut();
-            if s.is_cropping {
+            if s.is_active && s.mode == CaptureMode::Selection {
                 if let Some(sel) = &mut s.selection {
                     sel.end_x = sel.start_x + x;
                     sel.end_y = sel.start_y + y;
@@ -340,7 +382,7 @@ fn build_ui(app: &adw::Application) {
 
         move |_, x, y| {
             let mut s = state.borrow_mut();
-            if s.is_cropping {
+            if s.is_active && s.mode == CaptureMode::Selection {
                 if let Some(sel) = &mut s.selection {
                     sel.end_x = sel.start_x + x;
                     sel.end_y = sel.start_y + y;
@@ -362,34 +404,18 @@ fn build_ui(app: &adw::Application) {
 
         move |_| {
             let mut s = state.borrow_mut();
-            if s.is_cropping {
+            if s.is_active && s.mode == CaptureMode::Selection {
                 if let Some(sel) = s.selection {
                     let rect = sel.rectangle();
 
                     // Only crop if area is significant
                     if rect.width() > 10 && rect.height() > 10 {
                         if let Some(orig) = &s.original_screenshot {
-                            // Calculate scale used in draw
-                            let da_width = drawing_area.width() as f64;
-                            let da_height = drawing_area.height() as f64;
-                            let img_width = orig.width() as f64;
-                            let img_height = orig.height() as f64;
-
-                            let scale_x = da_width / img_width;
-                            let scale_y = da_height / img_height;
-                            let scale = scale_x.min(scale_y);
-
-                            // Transform widget coords to image coords
-                            let crop_x = (rect.x() as f64 / scale) as i32;
-                            let crop_y = (rect.y() as f64 / scale) as i32;
-                            let crop_w = (rect.width() as f64 / scale) as i32;
-                            let crop_h = (rect.height() as f64 / scale) as i32;
-
-                            // Clamp to image bounds
-                            let crop_x = crop_x.max(0).min(orig.width() - 1);
-                            let crop_y = crop_y.max(0).min(orig.height() - 1);
-                            let crop_w = crop_w.min(orig.width() - crop_x);
-                            let crop_h = crop_h.min(orig.height() - crop_y);
+                            // Assuming scale 1.0
+                            let crop_x = rect.x().max(0);
+                            let crop_y = rect.y().max(0);
+                            let crop_w = rect.width().min(orig.width() - crop_x);
+                            let crop_h = rect.height().min(orig.height() - crop_y);
 
                             if crop_w > 0 && crop_h > 0 {
                                 let cropped = orig.new_subpixbuf(crop_x, crop_y, crop_w, crop_h);
@@ -400,7 +426,7 @@ fn build_ui(app: &adw::Application) {
                 }
 
                 // Exit cropping mode
-                s.is_cropping = false;
+                s.is_active = false;
                 s.selection = None;
 
                 // Restore UI
@@ -426,11 +452,8 @@ fn build_ui(app: &adw::Application) {
 
         move |_| {
             let mut s = state.borrow_mut();
-            s.is_cropping = false;
+            s.is_active = false;
             s.selection = None;
-
-            // If we cancelled, we might want to revert to previous state or just clear
-            // For now, let's assume we keep the previous final_image if it existed, or show placeholder
 
             window.unfullscreen();
             header_bar.set_visible(true);
@@ -456,51 +479,206 @@ fn build_ui(app: &adw::Application) {
         let crop_tools_box = crop_tools_box.clone();
 
         move |_| {
-            // Hide window
-            window.set_visible(false);
+            let mode = state.borrow().mode;
 
-            let context = gtk::glib::MainContext::default();
-            while context.pending() {
-                context.iteration(false);
-            }
-            std::thread::sleep(Duration::from_millis(200));
+            if mode == CaptureMode::Window {
+                // Open Window Selector Modal
+                let window_selector = gtk::Window::builder()
+                    .title("Select Window")
+                    .modal(true)
+                    .transient_for(&window)
+                    .default_width(400)
+                    .default_height(500)
+                    .build();
 
-            // Capture
-            let monitors = Monitor::all().unwrap_or_default();
-            if let Some(monitor) = monitors.first() {
-                if let Ok(image) = monitor.capture_image() {
-                    let width = image.width() as i32;
-                    let height = image.height() as i32;
-                    let stride = width * 4;
-                    let pixels = image.into_raw();
-                    let bytes = gtk::glib::Bytes::from(&pixels);
+                let list_box = gtk::ListBox::builder()
+                    .selection_mode(gtk::SelectionMode::Single)
+                    .css_classes(["boxed-list"])
+                    .build();
 
-                    let pixbuf = gtk::gdk_pixbuf::Pixbuf::from_bytes(
-                        &bytes,
-                        gtk::gdk_pixbuf::Colorspace::Rgb,
-                        true,
-                        8,
-                        width,
-                        height,
-                        stride,
-                    );
+                let scrolled_window = gtk::ScrolledWindow::builder()
+                    .child(&list_box)
+                    .vexpand(true)
+                    .build();
 
-                    let mut s = state.borrow_mut();
-                    s.original_screenshot = Some(pixbuf);
-                    s.is_cropping = true;
-                    s.selection = None;
+                let vbox = gtk::Box::builder()
+                    .orientation(Orientation::Vertical)
+                    .spacing(12)
+                    .margin_top(12)
+                    .margin_bottom(12)
+                    .margin_start(12)
+                    .margin_end(12)
+                    .build();
+
+                vbox.append(&gtk::Label::new(Some("Select a window to capture:")));
+                vbox.append(&scrolled_window);
+                window_selector.set_child(Some(&vbox));
+
+                // Populate List
+                if let Ok(windows) = Window::all() {
+                    for win in windows {
+                        if win.is_minimized() {
+                            continue;
+                        }
+
+                        let row = gtk::Box::builder()
+                            .orientation(Orientation::Horizontal)
+                            .spacing(12)
+                            .build();
+
+                        // Icon
+                        let app_name = win.app_name();
+                        let icon_name = if app_name.is_empty() {
+                            "application-x-executable-symbolic"
+                        } else {
+                            // Try to guess icon name from app name (lowercase)
+                            // This is a heuristic.
+                            app_name
+                        };
+
+                        // We use a fallback logic: try specific icon, if fails, use generic
+                        let icon = gtk::Image::builder()
+                            .icon_name(icon_name.to_lowercase())
+                            .pixel_size(32)
+                            .build();
+                        // Note: GTK4 doesn't easily let us check if icon exists without more complex logic,
+                        // so we rely on the theme handling missing icons (usually shows a broken image or generic).
+                        // A better approach would be to check IconTheme.
+
+                        let label_text = if win.title().is_empty() {
+                            format!("{} (ID: {})", win.app_name(), win.id())
+                        } else {
+                            format!("{} — {}", win.title(), win.app_name())
+                        };
+
+                        let label = gtk::Label::builder()
+                            .label(&label_text)
+                            .halign(Align::Start)
+                            .ellipsize(gtk::pango::EllipsizeMode::End)
+                            .build();
+
+                        row.append(&icon);
+                        row.append(&label);
+
+                        list_box.append(&row);
+                    }
+                }
+
+                // Handle Selection
+                let state_clone = state.clone();
+                let drawing_area_clone = drawing_area.clone();
+                let placeholder_icon_clone = placeholder_icon.clone();
+                let window_selector_clone = window_selector.clone();
+
+                list_box.connect_row_activated(move |lb, row| {
+                    let idx = row.index();
+                    if idx >= 0 {
+                        if let Ok(windows) = Window::all() {
+                            let available_windows: Vec<_> =
+                                windows.into_iter().filter(|w| !w.is_minimized()).collect();
+
+                            if let Some(win) = available_windows.get(idx as usize) {
+                                if let Ok(image) = win.capture_image() {
+                                    let width = image.width() as i32;
+                                    let height = image.height() as i32;
+                                    let stride = width * 4;
+                                    let pixels = image.into_raw();
+                                    let bytes = gtk::glib::Bytes::from(&pixels);
+                                    let pixbuf = gtk::gdk_pixbuf::Pixbuf::from_bytes(
+                                        &bytes,
+                                        gtk::gdk_pixbuf::Colorspace::Rgb,
+                                        true,
+                                        8,
+                                        width,
+                                        height,
+                                        stride,
+                                    );
+
+                                    let mut s = state_clone.borrow_mut();
+                                    s.final_image = Some(pixbuf);
+                                    s.is_active = false;
+
+                                    placeholder_icon_clone.set_visible(false);
+                                    drawing_area_clone.queue_draw();
+                                }
+                            }
+                        }
+                    }
+                    window_selector_clone.close();
+                });
+
+                window_selector.present();
+            } else {
+                // Screen or Selection Mode
+
+                // Hide window
+                window.set_visible(false);
+
+                let context = gtk::glib::MainContext::default();
+                while context.pending() {
+                    context.iteration(false);
+                }
+                std::thread::sleep(Duration::from_millis(200));
+
+                // Capture
+                let monitors = Monitor::all().unwrap_or_default();
+                let monitor = monitors
+                    .iter()
+                    .find(|m| m.is_primary())
+                    .or(monitors.first());
+
+                if let Some(monitor) = monitor {
+                    let mx = monitor.x();
+                    let my = monitor.y();
+
+                    if let Ok(image) = monitor.capture_image() {
+                        let width = image.width() as i32;
+                        let height = image.height() as i32;
+                        let stride = width * 4;
+                        let pixels = image.into_raw();
+                        let bytes = gtk::glib::Bytes::from(&pixels);
+                        let pixbuf = gtk::gdk_pixbuf::Pixbuf::from_bytes(
+                            &bytes,
+                            gtk::gdk_pixbuf::Colorspace::Rgb,
+                            true,
+                            8,
+                            width,
+                            height,
+                            stride,
+                        );
+
+                        let mut s = state.borrow_mut();
+                        s.monitor_x = mx;
+                        s.monitor_y = my;
+
+                        if mode == CaptureMode::Screen {
+                            s.final_image = Some(pixbuf);
+                            s.is_active = false;
+                            window.set_visible(true);
+                            placeholder_icon.set_visible(false);
+                            drawing_area.queue_draw();
+                        } else {
+                            // Selection Mode
+                            s.original_screenshot = Some(pixbuf);
+                            s.is_active = true;
+                            s.selection = None;
+
+                            placeholder_icon.set_visible(false);
+                            header_bar.set_visible(false);
+                            tools_box.set_visible(false);
+                            crop_tools_box.set_visible(true);
+
+                            window.set_visible(true);
+                            window.fullscreen();
+                            drawing_area.queue_draw();
+                        }
+                    } else {
+                        window.set_visible(true);
+                    }
+                } else {
+                    window.set_visible(true);
                 }
             }
-
-            // Prepare UI for cropping
-            placeholder_icon.set_visible(false);
-            header_bar.set_visible(false);
-            tools_box.set_visible(false);
-            crop_tools_box.set_visible(true); // Show crop tools
-
-            window.set_visible(true);
-            window.fullscreen();
-            drawing_area.queue_draw();
         }
     });
 
