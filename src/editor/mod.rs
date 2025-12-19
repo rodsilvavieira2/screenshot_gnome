@@ -264,4 +264,72 @@ impl EditorState {
         self.pending_text = None;
         self.tool_state.reset_drag();
     }
+
+    // --- Pointer Tool Methods ---
+
+    /// Handle pointer tool drag start - tries to select an annotation at the click position
+    /// Returns true if an annotation was selected and drag started
+    pub fn pointer_drag_start(&mut self, display_x: f64, display_y: f64) -> bool {
+        let (img_x, img_y) = self.display_to_image_coords(display_x, display_y);
+
+        // Try to find an annotation at this position
+        if let Some(index) = self.annotations.hit_test(img_x, img_y) {
+            self.annotations.set_selected(Some(index));
+
+            // Get the annotation's position to calculate drag offset
+            if let Some((ann_x, ann_y)) = self.annotations.selected_position() {
+                self.tool_state
+                    .start_annotation_drag(img_x, img_y, ann_x, ann_y);
+                return true;
+            }
+        } else {
+            // Clicked on empty space - deselect
+            self.annotations.deselect();
+        }
+
+        false
+    }
+
+    /// Handle pointer tool drag update - moves the selected annotation
+    pub fn pointer_drag_update(&mut self, display_x: f64, display_y: f64) {
+        if !self.tool_state.is_dragging_annotation {
+            return;
+        }
+
+        let (img_x, img_y) = self.display_to_image_coords(display_x, display_y);
+        self.tool_state.update_annotation_drag(img_x, img_y);
+
+        // Calculate new position and move the annotation
+        if let Some((offset_x, offset_y)) = self.tool_state.pointer_drag_offset {
+            let new_x = img_x - offset_x;
+            let new_y = img_y - offset_y;
+
+            // Get current position to calculate delta
+            if let Some((old_x, old_y)) = self.annotations.selected_position() {
+                let dx = new_x - old_x;
+                let dy = new_y - old_y;
+                self.annotations.move_selected(dx, dy);
+            }
+        }
+    }
+
+    /// Handle pointer tool drag end
+    pub fn pointer_drag_end(&mut self) {
+        self.tool_state.end_annotation_drag();
+    }
+
+    /// Check if pointer tool is currently dragging an annotation
+    pub fn is_pointer_dragging(&self) -> bool {
+        self.tool_state.is_dragging_annotation
+    }
+
+    /// Deselect any selected annotation
+    pub fn deselect_annotation(&mut self) {
+        self.annotations.deselect();
+    }
+
+    /// Get the currently selected annotation index
+    pub fn selected_annotation_index(&self) -> Option<usize> {
+        self.annotations.selected_index()
+    }
 }

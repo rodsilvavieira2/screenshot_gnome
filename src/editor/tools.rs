@@ -67,6 +67,10 @@ pub struct ToolState {
     pub drag_start: Option<(f64, f64)>,
     /// Current position during drag
     pub drag_current: Option<(f64, f64)>,
+    /// For pointer tool: the offset from the annotation's position to the drag start point
+    pub pointer_drag_offset: Option<(f64, f64)>,
+    /// For pointer tool: whether we're currently dragging a selected annotation
+    pub is_dragging_annotation: bool,
 }
 
 impl Default for ToolState {
@@ -79,6 +83,8 @@ impl Default for ToolState {
             is_drawing: false,
             drag_start: None,
             drag_current: None,
+            pointer_drag_offset: None,
+            is_dragging_annotation: false,
         }
     }
 }
@@ -131,6 +137,46 @@ impl ToolState {
         self.is_drawing = false;
         self.drag_start = None;
         self.drag_current = None;
+        self.pointer_drag_offset = None;
+        self.is_dragging_annotation = false;
+    }
+
+    /// Start dragging an annotation with pointer tool
+    pub fn start_annotation_drag(
+        &mut self,
+        click_x: f64,
+        click_y: f64,
+        annotation_x: f64,
+        annotation_y: f64,
+    ) {
+        self.is_dragging_annotation = true;
+        self.drag_start = Some((click_x, click_y));
+        self.drag_current = Some((click_x, click_y));
+        // Store the offset from the annotation's position to where we clicked
+        self.pointer_drag_offset = Some((click_x - annotation_x, click_y - annotation_y));
+    }
+
+    /// Update annotation drag position
+    pub fn update_annotation_drag(&mut self, x: f64, y: f64) {
+        if self.is_dragging_annotation {
+            self.drag_current = Some((x, y));
+        }
+    }
+
+    /// End annotation drag and return the new position for the annotation
+    pub fn end_annotation_drag(&mut self) -> Option<(f64, f64)> {
+        if self.is_dragging_annotation {
+            if let (Some((current_x, current_y)), Some((offset_x, offset_y))) =
+                (self.drag_current, self.pointer_drag_offset)
+            {
+                let new_x = current_x - offset_x;
+                let new_y = current_y - offset_y;
+                self.reset_drag();
+                return Some((new_x, new_y));
+            }
+        }
+        self.reset_drag();
+        None
     }
 
     /// Get current drag rectangle (normalized to positive width/height)

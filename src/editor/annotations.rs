@@ -46,6 +46,47 @@ impl RectangleAnnotation {
         let height = (y2 - y1).abs();
         Self::new(x, y, width, height, color, line_width)
     }
+
+    /// Check if a point is inside or on the border of the rectangle
+    pub fn hit_test(&self, px: f64, py: f64) -> bool {
+        let margin = self.line_width.max(5.0);
+
+        if self.filled {
+            // For filled rectangles, check if point is inside
+            px >= self.x - margin
+                && px <= self.x + self.width + margin
+                && py >= self.y - margin
+                && py <= self.y + self.height + margin
+        } else {
+            // For stroke-only rectangles, check if point is near the border
+            let near_left = (px - self.x).abs() <= margin
+                && py >= self.y - margin
+                && py <= self.y + self.height + margin;
+            let near_right = (px - (self.x + self.width)).abs() <= margin
+                && py >= self.y - margin
+                && py <= self.y + self.height + margin;
+            let near_top = (py - self.y).abs() <= margin
+                && px >= self.x - margin
+                && px <= self.x + self.width + margin;
+            let near_bottom = (py - (self.y + self.height)).abs() <= margin
+                && px >= self.x - margin
+                && px <= self.x + self.width + margin;
+
+            near_left || near_right || near_top || near_bottom
+        }
+    }
+
+    /// Move the rectangle by the given offset
+    pub fn move_by(&mut self, dx: f64, dy: f64) {
+        self.x += dx;
+        self.y += dy;
+    }
+
+    /// Set the position of the rectangle
+    pub fn set_position(&mut self, x: f64, y: f64) {
+        self.x = x;
+        self.y = y;
+    }
 }
 
 /// Free drawing path annotation
@@ -67,6 +108,59 @@ impl FreeDrawAnnotation {
 
     pub fn add_point(&mut self, x: f64, y: f64) {
         self.points.push(Point::new(x, y));
+    }
+
+    /// Check if a point is near the free draw path
+    pub fn hit_test(&self, px: f64, py: f64) -> bool {
+        let margin = self.line_width.max(8.0);
+
+        for point in &self.points {
+            let dx = px - point.x;
+            let dy = py - point.y;
+            if dx * dx + dy * dy <= margin * margin {
+                return true;
+            }
+        }
+
+        // Also check line segments between points
+        for i in 0..self.points.len().saturating_sub(1) {
+            let p1 = &self.points[i];
+            let p2 = &self.points[i + 1];
+            if point_to_segment_distance(px, py, p1.x, p1.y, p2.x, p2.y) <= margin {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Move all points by the given offset
+    pub fn move_by(&mut self, dx: f64, dy: f64) {
+        for point in &mut self.points {
+            point.x += dx;
+            point.y += dy;
+        }
+    }
+
+    /// Get the bounding box of the free draw path
+    pub fn bounding_box(&self) -> Option<(f64, f64, f64, f64)> {
+        if self.points.is_empty() {
+            return None;
+        }
+
+        let mut min_x = f64::MAX;
+        let mut min_y = f64::MAX;
+        let mut max_x = f64::MIN;
+        let mut max_y = f64::MIN;
+
+        for point in &self.points {
+            min_x = min_x.min(point.x);
+            min_y = min_y.min(point.y);
+            max_x = max_x.max(point.x);
+            max_y = max_y.max(point.y);
+        }
+
+        Some((min_x, min_y, max_x - min_x, max_y - min_y))
     }
 }
 
@@ -92,6 +186,58 @@ impl TextAnnotation {
             font_family: "Sans".to_string(),
         }
     }
+
+    /// Check if a point is near the text (approximate bounding box)
+    pub fn hit_test(&self, px: f64, py: f64) -> bool {
+        // Approximate text width based on character count and font size
+        let approx_char_width = self.font_size * 0.6;
+        let text_width = self.text.len() as f64 * approx_char_width;
+        let text_height = self.font_size;
+
+        // Text is drawn with baseline at y, so the box extends upward
+        let margin = 5.0;
+        px >= self.x - margin
+            && px <= self.x + text_width + margin
+            && py >= self.y - text_height - margin
+            && py <= self.y + margin
+    }
+
+    /// Move the text by the given offset
+    pub fn move_by(&mut self, dx: f64, dy: f64) {
+        self.x += dx;
+        self.y += dy;
+    }
+
+    /// Set the position of the text
+    pub fn set_position(&mut self, x: f64, y: f64) {
+        self.x = x;
+        self.y = y;
+    }
+}
+
+/// Calculate the distance from a point to a line segment
+fn point_to_segment_distance(px: f64, py: f64, x1: f64, y1: f64, x2: f64, y2: f64) -> f64 {
+    let dx = x2 - x1;
+    let dy = y2 - y1;
+    let length_sq = dx * dx + dy * dy;
+
+    if length_sq == 0.0 {
+        // Segment is a point
+        let dpx = px - x1;
+        let dpy = py - y1;
+        return (dpx * dpx + dpy * dpy).sqrt();
+    }
+
+    // Project point onto line segment
+    let t = ((px - x1) * dx + (py - y1) * dy) / length_sq;
+    let t = t.clamp(0.0, 1.0);
+
+    let proj_x = x1 + t * dx;
+    let proj_y = y1 + t * dy;
+
+    let dpx = px - proj_x;
+    let dpy = py - proj_y;
+    (dpx * dpx + dpy * dpy).sqrt()
 }
 
 /// Enum representing all annotation types
@@ -103,6 +249,39 @@ pub enum Annotation {
 }
 
 impl Annotation {
+    /// Check if a point hits this annotation
+    pub fn hit_test(&self, px: f64, py: f64) -> bool {
+        match self {
+            Annotation::Rectangle(rect) => rect.hit_test(px, py),
+            Annotation::FreeDraw(draw) => draw.hit_test(px, py),
+            Annotation::Text(text) => text.hit_test(px, py),
+        }
+    }
+
+    /// Move the annotation by the given offset
+    pub fn move_by(&mut self, dx: f64, dy: f64) {
+        match self {
+            Annotation::Rectangle(rect) => rect.move_by(dx, dy),
+            Annotation::FreeDraw(draw) => draw.move_by(dx, dy),
+            Annotation::Text(text) => text.move_by(dx, dy),
+        }
+    }
+
+    /// Get the position of the annotation (top-left for rect, first point for draw, position for text)
+    pub fn position(&self) -> (f64, f64) {
+        match self {
+            Annotation::Rectangle(rect) => (rect.x, rect.y),
+            Annotation::FreeDraw(draw) => {
+                if let Some(first) = draw.points.first() {
+                    (first.x, first.y)
+                } else {
+                    (0.0, 0.0)
+                }
+            }
+            Annotation::Text(text) => (text.x, text.y),
+        }
+    }
+
     /// Draw the annotation on a cairo context
     pub fn draw(&self, cr: &gtk4::cairo::Context, scale: f64, offset_x: f64, offset_y: f64) {
         match self {
@@ -171,13 +350,94 @@ impl Annotation {
             }
         }
     }
+
+    /// Draw the annotation with selection highlight
+    pub fn draw_selected(
+        &self,
+        cr: &gtk4::cairo::Context,
+        scale: f64,
+        offset_x: f64,
+        offset_y: f64,
+    ) {
+        // Draw the annotation normally first
+        self.draw(cr, scale, offset_x, offset_y);
+
+        // Draw selection indicator
+        let (x, y, w, h) = match self {
+            Annotation::Rectangle(rect) => (rect.x, rect.y, rect.width, rect.height),
+            Annotation::FreeDraw(draw) => {
+                if let Some((bx, by, bw, bh)) = draw.bounding_box() {
+                    (bx, by, bw, bh)
+                } else {
+                    return;
+                }
+            }
+            Annotation::Text(text) => {
+                let approx_char_width = text.font_size * 0.6;
+                let text_width = text.text.len() as f64 * approx_char_width;
+                (text.x, text.y - text.font_size, text_width, text.font_size)
+            }
+        };
+
+        let margin = 4.0;
+        let dx = offset_x + (x - margin) * scale;
+        let dy = offset_y + (y - margin) * scale;
+        let dw = (w + margin * 2.0) * scale;
+        let dh = (h + margin * 2.0) * scale;
+
+        // Draw dashed selection border
+        cr.set_source_rgba(0.2, 0.6, 1.0, 0.8);
+        cr.set_line_width(2.0);
+        cr.set_dash(&[6.0, 4.0], 0.0);
+        cr.rectangle(dx, dy, dw, dh);
+        let _ = cr.stroke();
+
+        // Reset dash pattern
+        cr.set_dash(&[], 0.0);
+
+        // Draw corner handles
+        let handle_size = 8.0;
+        cr.set_source_rgba(0.2, 0.6, 1.0, 1.0);
+
+        // Top-left
+        cr.rectangle(
+            dx - handle_size / 2.0,
+            dy - handle_size / 2.0,
+            handle_size,
+            handle_size,
+        );
+        // Top-right
+        cr.rectangle(
+            dx + dw - handle_size / 2.0,
+            dy - handle_size / 2.0,
+            handle_size,
+            handle_size,
+        );
+        // Bottom-left
+        cr.rectangle(
+            dx - handle_size / 2.0,
+            dy + dh - handle_size / 2.0,
+            handle_size,
+            handle_size,
+        );
+        // Bottom-right
+        cr.rectangle(
+            dx + dw - handle_size / 2.0,
+            dy + dh - handle_size / 2.0,
+            handle_size,
+            handle_size,
+        );
+        let _ = cr.fill();
+    }
 }
 
-/// Collection of annotations with undo support
+/// Collection of annotations with undo support and selection tracking
 #[derive(Clone, Debug, Default)]
 pub struct AnnotationList {
     annotations: Vec<Annotation>,
     current_annotation: Option<Annotation>,
+    /// Index of the currently selected annotation (for pointer tool)
+    selected_index: Option<usize>,
 }
 
 impl AnnotationList {
@@ -185,6 +445,7 @@ impl AnnotationList {
         Self {
             annotations: Vec::new(),
             current_annotation: None,
+            selected_index: None,
         }
     }
 
@@ -207,12 +468,14 @@ impl AnnotationList {
     }
 
     pub fn undo(&mut self) -> bool {
+        self.selected_index = None;
         self.annotations.pop().is_some()
     }
 
     pub fn clear(&mut self) {
         self.annotations.clear();
         self.current_annotation = None;
+        self.selected_index = None;
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Annotation> {
@@ -223,9 +486,64 @@ impl AnnotationList {
         self.current_annotation.as_ref()
     }
 
+    /// Get mutable access to an annotation by index
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut Annotation> {
+        self.annotations.get_mut(index)
+    }
+
+    /// Get the currently selected annotation index
+    pub fn selected_index(&self) -> Option<usize> {
+        self.selected_index
+    }
+
+    /// Set the selected annotation index
+    pub fn set_selected(&mut self, index: Option<usize>) {
+        self.selected_index = index;
+    }
+
+    /// Deselect any selected annotation
+    pub fn deselect(&mut self) {
+        self.selected_index = None;
+    }
+
+    /// Find an annotation at the given point (returns the topmost one)
+    pub fn hit_test(&self, px: f64, py: f64) -> Option<usize> {
+        // Iterate in reverse to find the topmost (last drawn) annotation first
+        for (i, annotation) in self.annotations.iter().enumerate().rev() {
+            if annotation.hit_test(px, py) {
+                return Some(i);
+            }
+        }
+        None
+    }
+
+    /// Move the selected annotation by the given offset
+    pub fn move_selected(&mut self, dx: f64, dy: f64) -> bool {
+        if let Some(index) = self.selected_index {
+            if let Some(annotation) = self.annotations.get_mut(index) {
+                annotation.move_by(dx, dy);
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Get the position of the selected annotation
+    pub fn selected_position(&self) -> Option<(f64, f64)> {
+        if let Some(index) = self.selected_index {
+            self.annotations.get(index).map(|a| a.position())
+        } else {
+            None
+        }
+    }
+
     pub fn draw_all(&self, cr: &gtk4::cairo::Context, scale: f64, offset_x: f64, offset_y: f64) {
-        for annotation in &self.annotations {
-            annotation.draw(cr, scale, offset_x, offset_y);
+        for (i, annotation) in self.annotations.iter().enumerate() {
+            if Some(i) == self.selected_index {
+                annotation.draw_selected(cr, scale, offset_x, offset_y);
+            } else {
+                annotation.draw(cr, scale, offset_x, offset_y);
+            }
         }
 
         if let Some(current) = &self.current_annotation {

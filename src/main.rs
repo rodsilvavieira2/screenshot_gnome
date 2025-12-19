@@ -673,6 +673,10 @@ fn build_ui(app: &adw::Application) {
             if s.final_image.is_some() {
                 let tool = s.editor.current_tool();
                 match tool {
+                    EditorTool::Pointer => {
+                        // Try to select and start dragging an annotation
+                        s.editor.pointer_drag_start(x, y);
+                    }
                     EditorTool::Pencil => {
                         let (img_x, img_y) = s.editor.display_to_image_coords(x, y);
                         s.editor.tool_state.start_drag(img_x, img_y);
@@ -728,6 +732,10 @@ fn build_ui(app: &adw::Application) {
                     let (img_x, img_y) = s.editor.display_to_image_coords(current_x, current_y);
 
                     match tool {
+                        EditorTool::Pointer => {
+                            // Move the selected annotation if dragging
+                            s.editor.pointer_drag_update(current_x, current_y);
+                        }
                         EditorTool::Pencil => {
                             s.editor.tool_state.update_drag(img_x, img_y);
                             if let Some(Annotation::FreeDraw(ref draw)) =
@@ -798,6 +806,10 @@ fn build_ui(app: &adw::Application) {
                     let (img_x, img_y) = s.editor.display_to_image_coords(current_x, current_y);
 
                     match tool {
+                        EditorTool::Pointer => {
+                            // End annotation drag
+                            s.editor.pointer_drag_end();
+                        }
                         EditorTool::Pencil => {
                             s.editor.tool_state.update_drag(img_x, img_y);
                             s.editor.annotations.commit_current();
