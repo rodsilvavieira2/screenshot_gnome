@@ -1,7 +1,8 @@
 //! Window capture module using xcap library
 //!
 //! This module provides functionality to list available windows and capture their contents.
-//! Compatible with xcap version 0.0.14.
+//! Compatible with xcap version 0.4+.
+//! All xcap methods now return XCapResult<T>.
 
 #![allow(dead_code)]
 
@@ -14,6 +15,8 @@ use xcap::Window;
 pub struct WindowInfo {
     /// Window ID
     pub id: u32,
+    /// Process ID
+    pub pid: u32,
     /// Application name
     pub app_name: String,
     /// Window title
@@ -22,6 +25,8 @@ pub struct WindowInfo {
     pub x: i32,
     /// Window Y position
     pub y: i32,
+    /// Window Z position (z-order)
+    pub z: i32,
     /// Window width
     pub width: u32,
     /// Window height
@@ -30,22 +35,27 @@ pub struct WindowInfo {
     pub is_minimized: bool,
     /// Whether the window is maximized
     pub is_maximized: bool,
+    /// Whether the window is focused
+    pub is_focused: bool,
 }
 
 impl WindowInfo {
     /// Create WindowInfo from an xcap Window
-    fn from_xcap_window(window: &Window) -> Self {
-        Self {
-            id: window.id(),
-            app_name: window.app_name().to_string(),
-            title: window.title().to_string(),
-            x: window.x(),
-            y: window.y(),
-            width: window.width(),
-            height: window.height(),
-            is_minimized: window.is_minimized(),
-            is_maximized: window.is_maximized(),
-        }
+    fn from_xcap_window(window: &Window) -> Result<Self, String> {
+        Ok(Self {
+            id: window.id().map_err(|e| e.to_string())?,
+            pid: window.pid().map_err(|e| e.to_string())?,
+            app_name: window.app_name().map_err(|e| e.to_string())?,
+            title: window.title().map_err(|e| e.to_string())?,
+            x: window.x().map_err(|e| e.to_string())?,
+            y: window.y().map_err(|e| e.to_string())?,
+            z: window.z().map_err(|e| e.to_string())?,
+            width: window.width().map_err(|e| e.to_string())?,
+            height: window.height().map_err(|e| e.to_string())?,
+            is_minimized: window.is_minimized().map_err(|e| e.to_string())?,
+            is_maximized: window.is_maximized().map_err(|e| e.to_string())?,
+            is_focused: window.is_focused().map_err(|e| e.to_string())?,
+        })
     }
 
     /// Get a display label for this window
@@ -89,6 +99,8 @@ pub enum WindowCaptureError {
     ConversionFailed(String),
     /// Window is minimized and cannot be captured
     WindowMinimized,
+    /// Failed to get window info
+    InfoFailed(String),
 }
 
 impl std::fmt::Display for WindowCaptureError {
@@ -99,6 +111,7 @@ impl std::fmt::Display for WindowCaptureError {
             Self::CaptureFailed(msg) => write!(f, "Failed to capture window: {}", msg),
             Self::ConversionFailed(msg) => write!(f, "Failed to convert image: {}", msg),
             Self::WindowMinimized => write!(f, "Cannot capture minimized window"),
+            Self::InfoFailed(msg) => write!(f, "Failed to get window info: {}", msg),
         }
     }
 }
@@ -112,11 +125,20 @@ pub fn list_capturable_windows() -> Result<Vec<WindowInfo>, WindowCaptureError> 
     let windows =
         Window::all().map_err(|e| WindowCaptureError::EnumerationFailed(e.to_string()))?;
 
-    let window_infos: Vec<WindowInfo> = windows
-        .iter()
-        .filter(|w| !w.is_minimized())
-        .map(WindowInfo::from_xcap_window)
-        .collect();
+    let mut window_infos = Vec::new();
+
+    for window in &windows {
+        // Skip minimized windows as they cannot be captured
+        let is_minimized = window.is_minimized().unwrap_or(true);
+        if is_minimized {
+            continue;
+        }
+
+        match WindowInfo::from_xcap_window(window) {
+            Ok(info) => window_infos.push(info),
+            Err(e) => eprintln!("Warning: Failed to get info for a window: {}", e),
+        }
+    }
 
     Ok(window_infos)
 }
@@ -128,7 +150,14 @@ pub fn list_all_windows() -> Result<Vec<WindowInfo>, WindowCaptureError> {
     let windows =
         Window::all().map_err(|e| WindowCaptureError::EnumerationFailed(e.to_string()))?;
 
-    let window_infos: Vec<WindowInfo> = windows.iter().map(WindowInfo::from_xcap_window).collect();
+    let mut window_infos = Vec::new();
+
+    for window in &windows {
+        match WindowInfo::from_xcap_window(window) {
+            Ok(info) => window_infos.push(info),
+            Err(e) => eprintln!("Warning: Failed to get info for a window: {}", e),
+        }
+    }
 
     Ok(window_infos)
 }
@@ -146,7 +175,10 @@ pub fn capture_window_by_index(index: usize) -> Result<WindowCaptureResult, Wind
         Window::all().map_err(|e| WindowCaptureError::EnumerationFailed(e.to_string()))?;
 
     // Filter to non-minimized windows
-    let capturable_windows: Vec<_> = windows.into_iter().filter(|w| !w.is_minimized()).collect();
+    let capturable_windows: Vec<_> = windows
+        .into_iter()
+        .filter(|w| !w.is_minimized().unwrap_or(true))
+        .collect();
 
     let window = capturable_windows
         .get(index)
@@ -169,10 +201,10 @@ pub fn capture_window_by_id(window_id: u32) -> Result<WindowCaptureResult, Windo
 
     let window = windows
         .into_iter()
-        .find(|w| w.id() == window_id)
+        .find(|w| w.id().ok() == Some(window_id))
         .ok_or(WindowCaptureError::WindowNotFound)?;
 
-    if window.is_minimized() {
+    if window.is_minimized().unwrap_or(false) {
         return Err(WindowCaptureError::WindowMinimized);
     }
 
@@ -181,7 +213,8 @@ pub fn capture_window_by_id(window_id: u32) -> Result<WindowCaptureResult, Windo
 
 /// Internal function to capture a window
 fn capture_window_internal(window: &Window) -> Result<WindowCaptureResult, WindowCaptureError> {
-    let window_info = WindowInfo::from_xcap_window(window);
+    let window_info =
+        WindowInfo::from_xcap_window(window).map_err(|e| WindowCaptureError::InfoFailed(e))?;
 
     let image = window
         .capture_image()
@@ -222,14 +255,17 @@ mod tests {
     fn test_window_info_display_label() {
         let info = WindowInfo {
             id: 1,
+            pid: 100,
             app_name: "firefox".to_string(),
             title: "Mozilla Firefox".to_string(),
             x: 0,
             y: 0,
+            z: 0,
             width: 800,
             height: 600,
             is_minimized: false,
             is_maximized: false,
+            is_focused: true,
         };
 
         assert_eq!(info.display_label(), "Mozilla Firefox — firefox");
@@ -239,14 +275,17 @@ mod tests {
     fn test_window_info_display_label_no_title() {
         let info = WindowInfo {
             id: 1,
+            pid: 100,
             app_name: "firefox".to_string(),
             title: "".to_string(),
             x: 0,
             y: 0,
+            z: 0,
             width: 800,
             height: 600,
             is_minimized: false,
             is_maximized: false,
+            is_focused: true,
         };
 
         assert_eq!(info.display_label(), "firefox (ID: 1)");
@@ -256,14 +295,17 @@ mod tests {
     fn test_icon_name_hint() {
         let info = WindowInfo {
             id: 1,
+            pid: 100,
             app_name: "Firefox".to_string(),
             title: "".to_string(),
             x: 0,
             y: 0,
+            z: 0,
             width: 800,
             height: 600,
             is_minimized: false,
             is_maximized: false,
+            is_focused: true,
         };
 
         assert_eq!(info.icon_name_hint(), "Firefox");
@@ -273,14 +315,17 @@ mod tests {
     fn test_icon_name_hint_empty() {
         let info = WindowInfo {
             id: 1,
+            pid: 100,
             app_name: "".to_string(),
             title: "".to_string(),
             x: 0,
             y: 0,
+            z: 0,
             width: 800,
             height: 600,
             is_minimized: false,
             is_maximized: false,
+            is_focused: true,
         };
 
         assert_eq!(info.icon_name_hint(), "application-x-executable-symbolic");

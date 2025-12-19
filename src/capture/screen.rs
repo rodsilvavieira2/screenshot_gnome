@@ -1,7 +1,8 @@
 //! Screen capture module using xcap library
 //!
 //! This module provides functionality to capture monitors/screens
-//! following the xcap library patterns for version 0.0.14.
+//! following the xcap library patterns for version 0.4+.
+//! All xcap methods now return XCapResult<T>.
 
 #![allow(dead_code)]
 
@@ -21,23 +22,25 @@ pub struct MonitorInfo {
     pub scale_factor: f32,
     pub rotation: f32,
     pub frequency: f32,
+    pub is_builtin: bool,
 }
 
 impl MonitorInfo {
     /// Create MonitorInfo from xcap Monitor
-    fn from_xcap(monitor: &Monitor) -> Self {
-        Self {
-            id: monitor.id(),
-            name: monitor.name().to_string(),
-            x: monitor.x(),
-            y: monitor.y(),
-            width: monitor.width(),
-            height: monitor.height(),
-            is_primary: monitor.is_primary(),
-            scale_factor: monitor.scale_factor(),
-            rotation: monitor.rotation(),
-            frequency: monitor.frequency(),
-        }
+    fn from_xcap(monitor: &Monitor) -> Result<Self, String> {
+        Ok(Self {
+            id: monitor.id().map_err(|e| e.to_string())?,
+            name: monitor.name().map_err(|e| e.to_string())?,
+            x: monitor.x().map_err(|e| e.to_string())?,
+            y: monitor.y().map_err(|e| e.to_string())?,
+            width: monitor.width().map_err(|e| e.to_string())?,
+            height: monitor.height().map_err(|e| e.to_string())?,
+            is_primary: monitor.is_primary().map_err(|e| e.to_string())?,
+            scale_factor: monitor.scale_factor().map_err(|e| e.to_string())?,
+            rotation: monitor.rotation().map_err(|e| e.to_string())?,
+            frequency: monitor.frequency().map_err(|e| e.to_string())?,
+            is_builtin: monitor.is_builtin().map_err(|e| e.to_string())?,
+        })
     }
 }
 
@@ -51,7 +54,13 @@ pub struct CaptureResult {
 pub fn get_all_monitors() -> Result<Vec<MonitorInfo>, String> {
     let monitors = Monitor::all().map_err(|e| format!("Failed to get monitors: {}", e))?;
 
-    let infos: Vec<MonitorInfo> = monitors.iter().map(MonitorInfo::from_xcap).collect();
+    let mut infos = Vec::new();
+    for monitor in &monitors {
+        match MonitorInfo::from_xcap(monitor) {
+            Ok(info) => infos.push(info),
+            Err(e) => eprintln!("Warning: Failed to get info for a monitor: {}", e),
+        }
+    }
 
     if infos.is_empty() {
         Err("No monitors found".to_string())
@@ -64,12 +73,17 @@ pub fn get_all_monitors() -> Result<Vec<MonitorInfo>, String> {
 pub fn get_primary_monitor() -> Result<MonitorInfo, String> {
     let monitors = Monitor::all().map_err(|e| format!("Failed to get monitors: {}", e))?;
 
+    for monitor in &monitors {
+        if monitor.is_primary().unwrap_or(false) {
+            return MonitorInfo::from_xcap(monitor);
+        }
+    }
+
+    // Fallback to first monitor
     monitors
-        .iter()
-        .find(|m| m.is_primary())
-        .or(monitors.first())
-        .map(MonitorInfo::from_xcap)
-        .ok_or_else(|| "No primary monitor found".to_string())
+        .first()
+        .ok_or_else(|| "No monitors found".to_string())
+        .and_then(MonitorInfo::from_xcap)
 }
 
 /// Get monitor at specific point
@@ -77,16 +91,17 @@ pub fn get_monitor_at_point(x: i32, y: i32) -> Result<MonitorInfo, String> {
     let monitor =
         Monitor::from_point(x, y).map_err(|e| format!("Failed to get monitor at point: {}", e))?;
 
-    Ok(MonitorInfo::from_xcap(&monitor))
+    MonitorInfo::from_xcap(&monitor)
 }
 
 /// Capture the primary monitor
 pub fn capture_primary_monitor() -> Result<CaptureResult, String> {
     let monitors = Monitor::all().map_err(|e| format!("Failed to get monitors: {}", e))?;
 
+    // Find primary monitor
     let monitor = monitors
         .iter()
-        .find(|m| m.is_primary())
+        .find(|m| m.is_primary().unwrap_or(false))
         .or(monitors.first())
         .ok_or("No monitors available")?;
 
@@ -99,7 +114,7 @@ pub fn capture_monitor_by_id(monitor_id: u32) -> Result<CaptureResult, String> {
 
     let monitor = monitors
         .iter()
-        .find(|m| m.id() == monitor_id)
+        .find(|m| m.id().ok() == Some(monitor_id))
         .ok_or_else(|| format!("Monitor with ID {} not found", monitor_id))?;
 
     capture_monitor_internal(monitor)
@@ -111,7 +126,7 @@ pub fn capture_monitor_by_name(name: &str) -> Result<CaptureResult, String> {
 
     let monitor = monitors
         .iter()
-        .find(|m| m.name() == name)
+        .find(|m| m.name().ok().as_deref() == Some(name))
         .ok_or_else(|| format!("Monitor '{}' not found", name))?;
 
     capture_monitor_internal(monitor)
@@ -147,7 +162,7 @@ pub fn capture_all_monitors() -> Result<Vec<CaptureResult>, String> {
 
 /// Internal function to capture a monitor
 fn capture_monitor_internal(monitor: &Monitor) -> Result<CaptureResult, String> {
-    let monitor_info = MonitorInfo::from_xcap(monitor);
+    let monitor_info = MonitorInfo::from_xcap(monitor)?;
 
     let image = monitor
         .capture_image()
