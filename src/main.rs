@@ -102,6 +102,15 @@ fn build_ui(app: &adw::Application) {
     // We use a Frame with a dark background to simulate the capture area
     let canvas_area = gtk::Frame::builder().hexpand(true).vexpand(true).build();
 
+    let placeholder_icon = gtk::Image::builder()
+        .icon_name("image-x-generic-symbolic")
+        .pixel_size(128)
+        .opacity(0.2)
+        .halign(Align::Center)
+        .valign(Align::Center)
+        .build();
+    canvas_area.set_child(Some(&placeholder_icon));
+
     // Add a CSS provider to style the canvas dark
     let css_provider = gtk::CssProvider::new();
     css_provider.load_from_string("frame { background-color: #242424; }");
