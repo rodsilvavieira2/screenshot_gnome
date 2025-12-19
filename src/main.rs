@@ -198,7 +198,7 @@ fn build_ui(app: &adw::Application) {
         }
     });
 
-    // --- Toolbar ---
+    // --- Main Toolbar ---
     let tools_box = gtk::Box::builder()
         .orientation(Orientation::Horizontal)
         .spacing(6)
@@ -238,6 +238,33 @@ fn build_ui(app: &adw::Application) {
     save_btn.add_css_class("suggested-action");
     tools_box.append(&save_btn);
 
+    // --- Crop Confirmation Toolbar ---
+    let crop_tools_box = gtk::Box::builder()
+        .orientation(Orientation::Horizontal)
+        .spacing(12)
+        .halign(Align::Center)
+        .valign(Align::End)
+        .margin_bottom(24)
+        .visible(false) // Initially hidden
+        .build();
+    crop_tools_box.add_css_class("osd");
+    crop_tools_box.add_css_class("toolbar");
+
+    let cancel_btn = gtk::Button::builder()
+        .icon_name("process-stop-symbolic")
+        .tooltip_text("Cancel")
+        .build();
+    cancel_btn.add_css_class("destructive-action");
+
+    let confirm_btn = gtk::Button::builder()
+        .icon_name("object-select-symbolic")
+        .tooltip_text("Confirm Crop")
+        .build();
+    confirm_btn.add_css_class("suggested-action");
+
+    crop_tools_box.append(&cancel_btn);
+    crop_tools_box.append(&confirm_btn);
+
     // --- Placeholder ---
     let placeholder_icon = gtk::Image::builder()
         .icon_name("image-x-generic-symbolic")
@@ -251,6 +278,7 @@ fn build_ui(app: &adw::Application) {
     let overlay = gtk::Overlay::builder().child(&drawing_area).build();
     overlay.add_overlay(&placeholder_icon);
     overlay.add_overlay(&tools_box);
+    overlay.add_overlay(&crop_tools_box);
 
     let content = gtk::Box::builder()
         .orientation(Orientation::Vertical)
@@ -305,13 +333,10 @@ fn build_ui(app: &adw::Application) {
         }
     });
 
-    // Drag End (Perform Crop)
+    // Drag End (Just update selection)
     drag.connect_drag_end({
         let state = state.clone();
         let drawing_area = drawing_area.clone();
-        let window = window.clone();
-        let header_bar = header_bar.clone();
-        let tools_box = tools_box.clone();
 
         move |_, x, y| {
             let mut s = state.borrow_mut();
@@ -319,8 +344,26 @@ fn build_ui(app: &adw::Application) {
                 if let Some(sel) = &mut s.selection {
                     sel.end_x = sel.start_x + x;
                     sel.end_y = sel.start_y + y;
+                    drawing_area.queue_draw();
+                }
+            }
+        }
+    });
+    drawing_area.add_controller(drag);
 
-                    // Calculate crop rectangle
+    // Confirm Crop Action
+    confirm_btn.connect_clicked({
+        let state = state.clone();
+        let drawing_area = drawing_area.clone();
+        let window = window.clone();
+        let header_bar = header_bar.clone();
+        let tools_box = tools_box.clone();
+        let crop_tools_box = crop_tools_box.clone();
+
+        move |_| {
+            let mut s = state.borrow_mut();
+            if s.is_cropping {
+                if let Some(sel) = s.selection {
                     let rect = sel.rectangle();
 
                     // Only crop if area is significant
@@ -353,27 +396,54 @@ fn build_ui(app: &adw::Application) {
                                 s.final_image = Some(cropped);
                             }
                         }
-
-                        // Exit cropping mode
-                        s.is_cropping = false;
-                        s.selection = None;
-
-                        // Restore UI
-                        window.unfullscreen();
-                        header_bar.set_visible(true);
-                        tools_box.set_visible(true);
-
-                        drawing_area.queue_draw();
-                    } else {
-                        // Selection too small, just clear it
-                        s.selection = None;
-                        drawing_area.queue_draw();
                     }
                 }
+
+                // Exit cropping mode
+                s.is_cropping = false;
+                s.selection = None;
+
+                // Restore UI
+                window.unfullscreen();
+                header_bar.set_visible(true);
+                tools_box.set_visible(true);
+                crop_tools_box.set_visible(false);
+
+                drawing_area.queue_draw();
             }
         }
     });
-    drawing_area.add_controller(drag);
+
+    // Cancel Crop Action
+    cancel_btn.connect_clicked({
+        let state = state.clone();
+        let drawing_area = drawing_area.clone();
+        let window = window.clone();
+        let header_bar = header_bar.clone();
+        let tools_box = tools_box.clone();
+        let crop_tools_box = crop_tools_box.clone();
+        let placeholder_icon = placeholder_icon.clone();
+
+        move |_| {
+            let mut s = state.borrow_mut();
+            s.is_cropping = false;
+            s.selection = None;
+
+            // If we cancelled, we might want to revert to previous state or just clear
+            // For now, let's assume we keep the previous final_image if it existed, or show placeholder
+
+            window.unfullscreen();
+            header_bar.set_visible(true);
+            tools_box.set_visible(true);
+            crop_tools_box.set_visible(false);
+
+            if s.final_image.is_none() {
+                placeholder_icon.set_visible(true);
+            }
+
+            drawing_area.queue_draw();
+        }
+    });
 
     // Take Screenshot Action
     take_screenshot_btn.connect_clicked({
@@ -383,6 +453,7 @@ fn build_ui(app: &adw::Application) {
         let window = window.clone();
         let header_bar = header_bar.clone();
         let tools_box = tools_box.clone();
+        let crop_tools_box = crop_tools_box.clone();
 
         move |_| {
             // Hide window
@@ -425,6 +496,7 @@ fn build_ui(app: &adw::Application) {
             placeholder_icon.set_visible(false);
             header_bar.set_visible(false);
             tools_box.set_visible(false);
+            crop_tools_box.set_visible(true); // Show crop tools
 
             window.set_visible(true);
             window.fullscreen();
