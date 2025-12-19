@@ -6,7 +6,10 @@ use gtk::{Align, DrawingArea, GestureDrag, Orientation};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
-use xcap::{Monitor, Window};
+
+mod capture;
+
+use capture::{capture_primary_monitor, capture_window_by_index, list_capturable_windows};
 
 const APP_ID: &str = "org.example.ScreenshotGnome";
 
@@ -514,45 +517,22 @@ fn build_ui(app: &adw::Application) {
                 vbox.append(&scrolled_window);
                 window_selector.set_child(Some(&vbox));
 
-                // Populate List
-                if let Ok(windows) = Window::all() {
-                    for win in windows {
-                        if win.is_minimized() {
-                            continue;
-                        }
-
+                // Populate List using capture module
+                if let Ok(windows) = list_capturable_windows() {
+                    for win_info in &windows {
                         let row = gtk::Box::builder()
                             .orientation(Orientation::Horizontal)
                             .spacing(12)
                             .build();
 
-                        // Icon
-                        let app_name = win.app_name();
-                        let icon_name = if app_name.is_empty() {
-                            "application-x-executable-symbolic"
-                        } else {
-                            // Try to guess icon name from app name (lowercase)
-                            // This is a heuristic.
-                            app_name
-                        };
-
-                        // We use a fallback logic: try specific icon, if fails, use generic
+                        // Icon - use icon_name_hint from WindowInfo
                         let icon = gtk::Image::builder()
-                            .icon_name(icon_name.to_lowercase())
+                            .icon_name(win_info.icon_name_hint().to_lowercase())
                             .pixel_size(32)
                             .build();
-                        // Note: GTK4 doesn't easily let us check if icon exists without more complex logic,
-                        // so we rely on the theme handling missing icons (usually shows a broken image or generic).
-                        // A better approach would be to check IconTheme.
-
-                        let label_text = if win.title().is_empty() {
-                            format!("{} (ID: {})", win.app_name(), win.id())
-                        } else {
-                            format!("{} — {}", win.title(), win.app_name())
-                        };
 
                         let label = gtk::Label::builder()
-                            .label(&label_text)
+                            .label(&win_info.display_label())
                             .halign(Align::Start)
                             .ellipsize(gtk::pango::EllipsizeMode::End)
                             .build();
@@ -570,38 +550,17 @@ fn build_ui(app: &adw::Application) {
                 let placeholder_icon_clone = placeholder_icon.clone();
                 let window_selector_clone = window_selector.clone();
 
-                list_box.connect_row_activated(move |lb, row| {
+                list_box.connect_row_activated(move |_lb, row| {
                     let idx = row.index();
                     if idx >= 0 {
-                        if let Ok(windows) = Window::all() {
-                            let available_windows: Vec<_> =
-                                windows.into_iter().filter(|w| !w.is_minimized()).collect();
+                        // Use capture module to capture window by index
+                        if let Ok(result) = capture_window_by_index(idx as usize) {
+                            let mut s = state_clone.borrow_mut();
+                            s.final_image = Some(result.pixbuf);
+                            s.is_active = false;
 
-                            if let Some(win) = available_windows.get(idx as usize) {
-                                if let Ok(image) = win.capture_image() {
-                                    let width = image.width() as i32;
-                                    let height = image.height() as i32;
-                                    let stride = width * 4;
-                                    let pixels = image.into_raw();
-                                    let bytes = gtk::glib::Bytes::from(&pixels);
-                                    let pixbuf = gtk::gdk_pixbuf::Pixbuf::from_bytes(
-                                        &bytes,
-                                        gtk::gdk_pixbuf::Colorspace::Rgb,
-                                        true,
-                                        8,
-                                        width,
-                                        height,
-                                        stride,
-                                    );
-
-                                    let mut s = state_clone.borrow_mut();
-                                    s.final_image = Some(pixbuf);
-                                    s.is_active = false;
-
-                                    placeholder_icon_clone.set_visible(false);
-                                    drawing_area_clone.queue_draw();
-                                }
-                            }
+                            placeholder_icon_clone.set_visible(false);
+                            drawing_area_clone.queue_draw();
                         }
                     }
                     window_selector_clone.close();
@@ -620,46 +579,22 @@ fn build_ui(app: &adw::Application) {
                 }
                 std::thread::sleep(Duration::from_millis(200));
 
-                // Capture
-                let monitors = Monitor::all().unwrap_or_default();
-                let monitor = monitors
-                    .iter()
-                    .find(|m| m.is_primary())
-                    .or(monitors.first());
-
-                if let Some(monitor) = monitor {
-                    let mx = monitor.x();
-                    let my = monitor.y();
-
-                    if let Ok(image) = monitor.capture_image() {
-                        let width = image.width() as i32;
-                        let height = image.height() as i32;
-                        let stride = width * 4;
-                        let pixels = image.into_raw();
-                        let bytes = gtk::glib::Bytes::from(&pixels);
-                        let pixbuf = gtk::gdk_pixbuf::Pixbuf::from_bytes(
-                            &bytes,
-                            gtk::gdk_pixbuf::Colorspace::Rgb,
-                            true,
-                            8,
-                            width,
-                            height,
-                            stride,
-                        );
-
+                // Capture using the capture module
+                match capture_primary_monitor() {
+                    Ok(result) => {
                         let mut s = state.borrow_mut();
-                        s.monitor_x = mx;
-                        s.monitor_y = my;
+                        s.monitor_x = result.monitor_info.x;
+                        s.monitor_y = result.monitor_info.y;
 
                         if mode == CaptureMode::Screen {
-                            s.final_image = Some(pixbuf);
+                            s.final_image = Some(result.pixbuf);
                             s.is_active = false;
                             window.set_visible(true);
                             placeholder_icon.set_visible(false);
                             drawing_area.queue_draw();
                         } else {
                             // Selection Mode
-                            s.original_screenshot = Some(pixbuf);
+                            s.original_screenshot = Some(result.pixbuf);
                             s.is_active = true;
                             s.selection = None;
 
@@ -672,11 +607,11 @@ fn build_ui(app: &adw::Application) {
                             window.fullscreen();
                             drawing_area.queue_draw();
                         }
-                    } else {
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to capture screen: {}", e);
                         window.set_visible(true);
                     }
-                } else {
-                    window.set_visible(true);
                 }
             }
         }
