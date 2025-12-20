@@ -1,9 +1,11 @@
+use gtk::glib;
 use gtk4 as gtk;
 use libadwaita as adw;
 
 use gtk::{GestureClick, GestureDrag};
 use gtk4::prelude::*;
 use std::cell::RefCell;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -52,6 +54,37 @@ pub fn connect_copy_handler(state: &Rc<RefCell<AppState>>, components: &UiCompon
                     println!("Image copied to clipboard");
                 }
             }
+        }
+    });
+}
+
+pub fn connect_save_handler(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
+    components.toolbar.save_btn.connect_clicked({
+        let state = state.clone();
+        let window = components.window.clone();
+        move |_| {
+            let state = state.clone();
+            let window = window.clone();
+            glib::spawn_future_local(async move {
+                let dialog = gtk::FileDialog::new();
+                match dialog.select_folder_future(Some(&window)).await {
+                    Ok(folder) => {
+                        if let Some(folder_path) = folder.path() {
+                            let mut path = PathBuf::from(folder_path);
+                            path.push("screenshot.png");
+                            let s = state.borrow();
+                            if let Some(ref pixbuf) = s.final_image {
+                                if let Err(e) = pixbuf.savev(path.to_str().unwrap(), "png", &[]) {
+                                    eprintln!("Failed to save image: {}", e);
+                                } else {
+                                    println!("Image saved to {:?}", path);
+                                }
+                            }
+                        }
+                    }
+                    Err(_) => {}
+                }
+            });
         }
     });
 }
@@ -500,6 +533,7 @@ fn capture_screen_or_selection(
 pub fn connect_all_handlers(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
     connect_undo_handler(state, components);
     connect_copy_handler(state, components);
+    connect_save_handler(state, components);
     connect_drag_handlers(state, components);
     connect_click_handlers(state, components);
     connect_crop_handlers(state, components);
