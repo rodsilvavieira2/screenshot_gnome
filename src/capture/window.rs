@@ -118,9 +118,6 @@ impl std::fmt::Display for WindowCaptureError {
 
 impl std::error::Error for WindowCaptureError {}
 
-/// Get a list of all available windows that can be captured
-///
-/// Returns a list of WindowInfo for all non-minimized windows.
 pub fn list_capturable_windows() -> Result<Vec<WindowInfo>, WindowCaptureError> {
     let windows =
         Window::all().map_err(|e| WindowCaptureError::EnumerationFailed(e.to_string()))?;
@@ -128,7 +125,6 @@ pub fn list_capturable_windows() -> Result<Vec<WindowInfo>, WindowCaptureError> 
     let mut window_infos = Vec::new();
 
     for window in &windows {
-        // Skip minimized windows as they cannot be captured
         let is_minimized = window.is_minimized().unwrap_or(true);
         if is_minimized {
             continue;

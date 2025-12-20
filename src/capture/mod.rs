@@ -9,7 +9,7 @@ pub mod window;
 
 // Re-export only the items that are actually used by main.rs
 pub use screen::capture_primary_monitor;
-pub use window::{capture_window_by_index, list_capturable_windows};
+pub use window::{capture_window_by_id, list_capturable_windows};
 
 // The following are available via the submodules for future use:
 // - screen::CaptureResult, screen::MonitorInfo
@@ -17,4 +17,4 @@ pub use window::{capture_window_by_index, list_capturable_windows};
 // - screen::capture_monitor_by_id, screen::capture_monitor_by_name
 // - screen::capture_monitor_at_point, screen::capture_all_monitors
 // - window::WindowInfo, window::WindowCaptureResult, window::WindowCaptureError
-// - window::list_all_windows, window::capture_window_by_id
+// - window::list_all_windows, window::capture_window_by_index

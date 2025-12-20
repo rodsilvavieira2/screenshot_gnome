@@ -11,7 +11,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::app::AppState;
-use crate::capture::{capture_window_by_index, list_capturable_windows};
+use crate::capture::{capture_window_by_id, list_capturable_windows};
 
 /// Components for the text input popover
 pub struct TextPopoverComponents {
@@ -156,9 +156,15 @@ pub fn show_window_selector(
     vbox.append(&scrolled_window);
     window_selector.set_child(Some(&vbox));
 
+    // Store window IDs for each row to avoid race conditions
+    let window_ids: Rc<RefCell<Vec<u32>>> = Rc::new(RefCell::new(Vec::new()));
+
     // Populate the list with available windows
     if let Ok(windows) = list_capturable_windows() {
         for win_info in &windows {
+            // Store the window ID
+            window_ids.borrow_mut().push(win_info.id);
+
             let row = gtk::Box::builder()
                 .orientation(Orientation::Horizontal)
                 .spacing(12)
@@ -190,18 +196,23 @@ pub fn show_window_selector(
         let drawing_area = drawing_area.clone();
         let placeholder_icon = placeholder_icon.clone();
         let window_selector = window_selector.clone();
+        let window_ids = window_ids.clone();
         move |_lb, row| {
             let idx = row.index();
             if idx >= 0 {
-                // Capture the selected window
-                if let Ok(result) = capture_window_by_index(idx as usize) {
-                    let mut s = state.borrow_mut();
-                    s.final_image = Some(result.pixbuf);
-                    s.is_active = false;
-                    s.editor.reset();
+                // Get window ID from our stored list
+                let ids = window_ids.borrow();
+                if let Some(&window_id) = ids.get(idx as usize) {
+                    // Capture the selected window by ID
+                    if let Ok(result) = capture_window_by_id(window_id) {
+                        let mut s = state.borrow_mut();
+                        s.final_image = Some(result.pixbuf);
+                        s.is_active = false;
+                        s.editor.reset();
 
-                    placeholder_icon.set_visible(false);
-                    drawing_area.queue_draw();
+                        placeholder_icon.set_visible(false);
+                        drawing_area.queue_draw();
+                    }
                 }
             }
             window_selector.close();
