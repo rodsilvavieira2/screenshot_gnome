@@ -1,18 +1,18 @@
 use gtk4::gdk::RGBA;
 use gtk4::gdk_pixbuf::Pixbuf;
 
-/// Result of a color pick operation
+
 #[derive(Clone, Debug)]
 pub struct PickedColor {
-    /// The RGBA color
+    
     pub color: RGBA,
-    /// The position where the color was picked (in image coordinates)
+    
     pub x: i32,
     pub y: i32,
 }
 
 impl PickedColor {
-    /// Get the color as a hex string (e.g., "#FF0000")
+    
     pub fn to_hex(&self) -> String {
         format!(
             "#{:02X}{:02X}{:02X}",
@@ -22,7 +22,7 @@ impl PickedColor {
         )
     }
 
-    /// Get the color as RGB values (0-255)
+    
     pub fn to_rgb(&self) -> (u8, u8, u8) {
         (
             (self.color.red() * 255.0) as u8,
@@ -31,7 +31,7 @@ impl PickedColor {
         )
     }
 
-    /// Get the color as RGBA values (0-255)
+    
     pub fn to_rgba(&self) -> (u8, u8, u8, u8) {
         (
             (self.color.red() * 255.0) as u8,
@@ -42,7 +42,7 @@ impl PickedColor {
     }
 }
 
-/// Error types for color picking operations
+
 #[derive(Debug)]
 pub enum ColorPickError {
     OutOfBounds,
@@ -60,7 +60,7 @@ impl std::fmt::Display for ColorPickError {
 
 impl std::error::Error for ColorPickError {}
 
-/// Pick a color from a pixbuf at the given coordinates
+
 pub fn pick_color_from_pixbuf(
     pixbuf: &Pixbuf,
     x: i32,
@@ -69,7 +69,7 @@ pub fn pick_color_from_pixbuf(
     let width = pixbuf.width();
     let height = pixbuf.height();
 
-    // Check bounds
+    
     if x < 0 || x >= width || y < 0 || y >= height {
         return Err(ColorPickError::OutOfBounds);
     }
@@ -78,10 +78,10 @@ pub fn pick_color_from_pixbuf(
     let rowstride = pixbuf.rowstride() as usize;
     let has_alpha = pixbuf.has_alpha();
 
-    // Get pixel data
+    
     let pixels = unsafe { pixbuf.pixels() };
 
-    // Calculate offset to the pixel
+    
     let offset = (y as usize) * rowstride + (x as usize) * n_channels;
 
     if offset + n_channels > pixels.len() {
@@ -104,7 +104,7 @@ pub fn pick_color_from_pixbuf(
     })
 }
 
-/// Pick color from pixbuf using display coordinates (with scale and offset)
+
 pub fn pick_color_at_display_coords(
     pixbuf: &Pixbuf,
     display_x: f64,
@@ -113,14 +113,14 @@ pub fn pick_color_at_display_coords(
     offset_x: f64,
     offset_y: f64,
 ) -> Result<PickedColor, ColorPickError> {
-    // Convert display coordinates to image coordinates
+    
     let img_x = ((display_x - offset_x) / scale) as i32;
     let img_y = ((display_y - offset_y) / scale) as i32;
 
     pick_color_from_pixbuf(pixbuf, img_x, img_y)
 }
 
-/// Get average color from a region (useful for smoother color picking)
+
 pub fn pick_average_color(
     pixbuf: &Pixbuf,
     center_x: i32,
@@ -130,7 +130,7 @@ pub fn pick_average_color(
     let width = pixbuf.width();
     let height = pixbuf.height();
 
-    // Check if center is in bounds
+    
     if center_x < 0 || center_x >= width || center_y < 0 || center_y >= height {
         return Err(ColorPickError::OutOfBounds);
     }
@@ -185,12 +185,12 @@ pub fn pick_average_color(
     })
 }
 
-/// Color picker state for UI integration
+
 #[derive(Clone, Debug, Default)]
 pub struct ColorPickerState {
-    /// Last picked color
+    
     pub picked_color: Option<PickedColor>,
-    /// Whether color picker mode is active
+    
     pub is_active: bool,
 }
 

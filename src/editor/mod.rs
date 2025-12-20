@@ -1,12 +1,12 @@
-//! Editor module for screenshot annotation and editing tools
-//!
-//! This module provides tools for:
-//! - Drawing rectangles
-//! - Free-hand drawing
-//! - Adding text annotations
-//! - Cropping images
-//! - Picking colors from images
-//! - Clipboard operations
+
+
+
+
+
+
+
+
+
 
 #![allow(dead_code)]
 
@@ -15,7 +15,7 @@ pub mod clipboard;
 pub mod color_picker;
 pub mod tools;
 
-// Re-export commonly used types
+
 pub use annotations::{
     Annotation, AnnotationList, FreeDrawAnnotation, RectangleAnnotation, TextAnnotation,
 };
@@ -26,26 +26,26 @@ pub use tools::{EditorTool, ToolState};
 use gtk4::gdk::RGBA;
 use gtk4::gdk_pixbuf::Pixbuf;
 
-/// Main editor state that combines all editing functionality
+
 #[derive(Clone, Debug)]
 pub struct EditorState {
-    /// Tool state (active tool, color, line width, etc.)
+    
     pub tool_state: ToolState,
-    /// All annotations on the current image
+    
     pub annotations: AnnotationList,
-    /// Color picker state
+    
     pub color_picker: ColorPickerState,
-    /// Text input state (for text tool)
+    
     pub pending_text: Option<PendingText>,
-    /// Whether editing mode is active
+    
     pub is_editing: bool,
-    /// Image display scaling info (for coordinate conversion)
+    
     pub display_scale: f64,
     pub display_offset_x: f64,
     pub display_offset_y: f64,
 }
 
-/// Pending text annotation being edited
+
 #[derive(Clone, Debug)]
 pub struct PendingText {
     pub x: f64,
@@ -73,49 +73,49 @@ impl EditorState {
         Self::default()
     }
 
-    /// Set the current active tool
+    
     pub fn set_tool(&mut self, tool: EditorTool) {
         self.tool_state.set_tool(tool);
         self.pending_text = None;
     }
 
-    /// Get the current active tool
+    
     pub fn current_tool(&self) -> EditorTool {
         self.tool_state.active_tool
     }
 
-    /// Set the drawing color
+    
     pub fn set_color(&mut self, color: RGBA) {
         self.tool_state.set_color(color);
     }
 
-    /// Get the current drawing color
+    
     pub fn current_color(&self) -> RGBA {
         self.tool_state.color
     }
 
-    /// Update display transformation info (for coordinate conversion)
+    
     pub fn update_display_transform(&mut self, scale: f64, offset_x: f64, offset_y: f64) {
         self.display_scale = scale;
         self.display_offset_x = offset_x;
         self.display_offset_y = offset_y;
     }
 
-    /// Convert display coordinates to image coordinates
+    
     pub fn display_to_image_coords(&self, display_x: f64, display_y: f64) -> (f64, f64) {
         let img_x = (display_x - self.display_offset_x) / self.display_scale;
         let img_y = (display_y - self.display_offset_y) / self.display_scale;
         (img_x, img_y)
     }
 
-    /// Convert image coordinates to display coordinates
+    
     pub fn image_to_display_coords(&self, img_x: f64, img_y: f64) -> (f64, f64) {
         let display_x = img_x * self.display_scale + self.display_offset_x;
         let display_y = img_y * self.display_scale + self.display_offset_y;
         (display_x, display_y)
     }
 
-    /// Handle drag start event
+    
     pub fn on_drag_start(&mut self, x: f64, y: f64) {
         let (img_x, img_y) = self.display_to_image_coords(x, y);
         self.tool_state.start_drag(img_x, img_y);
@@ -129,7 +129,7 @@ impl EditorState {
                     .set_current(Some(Annotation::FreeDraw(free_draw)));
             }
             EditorTool::Rectangle => {
-                // Rectangle will be created during drag update
+                
             }
             EditorTool::Text => {
                 self.pending_text = Some(PendingText {
@@ -142,7 +142,7 @@ impl EditorState {
         }
     }
 
-    /// Handle drag update event
+    
     pub fn on_drag_update(&mut self, x: f64, y: f64) {
         let (img_x, img_y) = self.display_to_image_coords(x, y);
         self.tool_state.update_drag(img_x, img_y);
@@ -178,7 +178,7 @@ impl EditorState {
         }
     }
 
-    /// Handle drag end event
+    
     pub fn on_drag_end(&mut self, _x: f64, _y: f64) {
         match self.tool_state.active_tool {
             EditorTool::Pencil | EditorTool::Rectangle => {
@@ -189,7 +189,7 @@ impl EditorState {
         self.tool_state.end_drag();
     }
 
-    /// Handle click event (for color picker and text placement)
+    
     pub fn on_click(&mut self, x: f64, y: f64, pixbuf: Option<&Pixbuf>) -> Option<RGBA> {
         let (img_x, img_y) = self.display_to_image_coords(x, y);
 
@@ -216,7 +216,7 @@ impl EditorState {
         None
     }
 
-    /// Commit pending text annotation
+    
     pub fn commit_text(&mut self, text: String) {
         if let Some(pending) = self.pending_text.take() {
             if !text.is_empty() {
@@ -232,22 +232,22 @@ impl EditorState {
         }
     }
 
-    /// Cancel pending text
+    
     pub fn cancel_text(&mut self) {
         self.pending_text = None;
     }
 
-    /// Undo the last annotation
+    
     pub fn undo(&mut self) -> bool {
         self.annotations.undo()
     }
 
-    /// Clear all annotations
+    
     pub fn clear_annotations(&mut self) {
         self.annotations.clear();
     }
 
-    /// Draw all annotations on a cairo context
+    
     pub fn draw_annotations(&self, cr: &gtk4::cairo::Context) {
         self.annotations.draw_all(
             cr,
@@ -257,7 +257,7 @@ impl EditorState {
         );
     }
 
-    /// Reset editor state for a new image
+    
     pub fn reset(&mut self) {
         self.annotations.clear();
         self.color_picker.clear();
@@ -265,32 +265,32 @@ impl EditorState {
         self.tool_state.reset_drag();
     }
 
-    // --- Pointer Tool Methods ---
+    
 
-    /// Handle pointer tool drag start - tries to select an annotation at the click position
-    /// Returns true if an annotation was selected and drag started
+    
+    
     pub fn pointer_drag_start(&mut self, display_x: f64, display_y: f64) -> bool {
         let (img_x, img_y) = self.display_to_image_coords(display_x, display_y);
 
-        // Try to find an annotation at this position
+        
         if let Some(index) = self.annotations.hit_test(img_x, img_y) {
             self.annotations.set_selected(Some(index));
 
-            // Get the annotation's position to calculate drag offset
+            
             if let Some((ann_x, ann_y)) = self.annotations.selected_position() {
                 self.tool_state
                     .start_annotation_drag(img_x, img_y, ann_x, ann_y);
                 return true;
             }
         } else {
-            // Clicked on empty space - deselect
+            
             self.annotations.deselect();
         }
 
         false
     }
 
-    /// Handle pointer tool drag update - moves the selected annotation
+    
     pub fn pointer_drag_update(&mut self, display_x: f64, display_y: f64) {
         if !self.tool_state.is_dragging_annotation {
             return;
@@ -299,12 +299,12 @@ impl EditorState {
         let (img_x, img_y) = self.display_to_image_coords(display_x, display_y);
         self.tool_state.update_annotation_drag(img_x, img_y);
 
-        // Calculate new position and move the annotation
+        
         if let Some((offset_x, offset_y)) = self.tool_state.pointer_drag_offset {
             let new_x = img_x - offset_x;
             let new_y = img_y - offset_y;
 
-            // Get current position to calculate delta
+            
             if let Some((old_x, old_y)) = self.annotations.selected_position() {
                 let dx = new_x - old_x;
                 let dy = new_y - old_y;
@@ -313,22 +313,22 @@ impl EditorState {
         }
     }
 
-    /// Handle pointer tool drag end
+    
     pub fn pointer_drag_end(&mut self) {
         self.tool_state.end_annotation_drag();
     }
 
-    /// Check if pointer tool is currently dragging an annotation
+    
     pub fn is_pointer_dragging(&self) -> bool {
         self.tool_state.is_dragging_annotation
     }
 
-    /// Deselect any selected annotation
+    
     pub fn deselect_annotation(&mut self) {
         self.annotations.deselect();
     }
 
-    /// Get the currently selected annotation index
+    
     pub fn selected_annotation_index(&self) -> Option<usize> {
         self.annotations.selected_index()
     }

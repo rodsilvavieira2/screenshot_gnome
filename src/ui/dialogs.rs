@@ -1,7 +1,7 @@
-//! Dialog UI components
-//!
-//! This module contains dialogs and popovers used in the application,
-//! including the text input popover and window selector dialog.
+
+
+
+
 
 use gtk4 as gtk;
 
@@ -13,7 +13,7 @@ use std::rc::Rc;
 use crate::app::AppState;
 use crate::capture::{capture_window_by_id, list_capturable_windows};
 
-/// Components for the text input popover
+
 pub struct TextPopoverComponents {
     pub text_popover: gtk::Popover,
     pub text_entry: gtk::Entry,
@@ -21,7 +21,7 @@ pub struct TextPopoverComponents {
     pub text_cancel_btn: gtk::Button,
 }
 
-/// Create the text input popover for adding text annotations
+
 pub fn create_text_popover(drawing_area: &gtk::DrawingArea) -> TextPopoverComponents {
     let text_entry = gtk::Entry::builder()
         .placeholder_text("Enter text...")
@@ -65,13 +65,13 @@ pub fn create_text_popover(drawing_area: &gtk::DrawingArea) -> TextPopoverCompon
     }
 }
 
-/// Connect the text popover event handlers
+
 pub fn connect_text_popover(
     state: &Rc<RefCell<AppState>>,
     drawing_area: &gtk::DrawingArea,
     components: &TextPopoverComponents,
 ) {
-    // Confirm button
+    
     components.text_confirm_btn.connect_clicked({
         let state = state.clone();
         let drawing_area = drawing_area.clone();
@@ -87,7 +87,7 @@ pub fn connect_text_popover(
         }
     });
 
-    // Cancel button
+    
     components.text_cancel_btn.connect_clicked({
         let state = state.clone();
         let drawing_area = drawing_area.clone();
@@ -101,7 +101,7 @@ pub fn connect_text_popover(
         }
     });
 
-    // Enter key in text entry
+    
     components.text_entry.connect_activate({
         let state = state.clone();
         let drawing_area = drawing_area.clone();
@@ -118,7 +118,7 @@ pub fn connect_text_popover(
     });
 }
 
-/// Show the window selector dialog for capturing a specific window
+
 pub fn show_window_selector(
     state: &Rc<RefCell<AppState>>,
     parent_window: &impl IsA<gtk::Window>,
@@ -156,13 +156,13 @@ pub fn show_window_selector(
     vbox.append(&scrolled_window);
     window_selector.set_child(Some(&vbox));
 
-    // Store window IDs for each row to avoid race conditions
+    
     let window_ids: Rc<RefCell<Vec<u32>>> = Rc::new(RefCell::new(Vec::new()));
 
-    // Populate the list with available windows
+    
     if let Ok(windows) = list_capturable_windows() {
         for win_info in &windows {
-            // Store the window ID
+            
             window_ids.borrow_mut().push(win_info.id);
 
             let row = gtk::Box::builder()
@@ -170,13 +170,13 @@ pub fn show_window_selector(
                 .spacing(12)
                 .build();
 
-            // Window icon
+            
             let icon = gtk::Image::builder()
                 .icon_name(win_info.icon_name_hint().to_lowercase())
                 .pixel_size(32)
                 .build();
 
-            // Window title
+            
             let label = gtk::Label::builder()
                 .label(&win_info.display_label())
                 .halign(Align::Start)
@@ -190,7 +190,7 @@ pub fn show_window_selector(
         }
     }
 
-    // Handle window selection
+    
     list_box.connect_row_activated({
         let state = state.clone();
         let drawing_area = drawing_area.clone();
@@ -200,10 +200,10 @@ pub fn show_window_selector(
         move |_lb, row| {
             let idx = row.index();
             if idx >= 0 {
-                // Get window ID from our stored list
+                
                 let ids = window_ids.borrow();
                 if let Some(&window_id) = ids.get(idx as usize) {
-                    // Capture the selected window by ID
+                    
                     if let Ok(result) = capture_window_by_id(window_id) {
                         let mut s = state.borrow_mut();
                         s.final_image = Some(result.pixbuf);

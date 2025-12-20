@@ -1,7 +1,7 @@
-//! Header bar UI component
-//!
-//! This module contains the header bar with capture mode selection,
-//! delay controls, and the take screenshot button.
+
+
+
+
 
 #![allow(dead_code)]
 
@@ -15,7 +15,7 @@ use std::rc::Rc;
 
 use crate::app::{AppState, CaptureMode};
 
-/// Components created by the header bar builder
+
 pub struct HeaderComponents {
     pub header_bar: adw::HeaderBar,
     pub take_screenshot_btn: gtk::Button,
@@ -27,16 +27,16 @@ pub struct HeaderComponents {
     pub delay_plus: gtk::Button,
 }
 
-/// Create the header bar with all its components
+
 pub fn create_header_bar(state: &Rc<RefCell<AppState>>) -> HeaderComponents {
-    // Take screenshot button
+    
     let take_screenshot_btn = gtk::Button::builder()
         .label("Take Screenshot")
         .icon_name("camera-photo-symbolic")
         .build();
     take_screenshot_btn.add_css_class("suggested-action");
 
-    // Mode label and toggles
+    
     let mode_label = gtk::Label::new(Some("Mode:"));
     mode_label.add_css_class("dim-label");
 
@@ -61,7 +61,7 @@ pub fn create_header_bar(state: &Rc<RefCell<AppState>>) -> HeaderComponents {
     mode_box.append(&mode_window);
     mode_box.append(&mode_screen);
 
-    // Connect mode toggles
+    
     connect_mode_toggles(state, &mode_selection, &mode_window, &mode_screen);
 
     let title_box = gtk::Box::builder()
@@ -71,7 +71,7 @@ pub fn create_header_bar(state: &Rc<RefCell<AppState>>) -> HeaderComponents {
     title_box.append(&mode_label);
     title_box.append(&mode_box);
 
-    // Delay controls
+    
     let delay_label = gtk::Label::new(Some("Delay:"));
     delay_label.add_css_class("dim-label");
 
@@ -91,10 +91,10 @@ pub fn create_header_bar(state: &Rc<RefCell<AppState>>) -> HeaderComponents {
     delay_controls.append(&delay_minus);
     delay_controls.append(&delay_plus);
 
-    // Connect delay controls
+    
     connect_delay_controls(state, &delay_value, &delay_minus, &delay_plus);
 
-    // Menu button
+    
     let menu_btn = gtk::MenuButton::builder()
         .icon_name("open-menu-symbolic")
         .build();
@@ -108,7 +108,7 @@ pub fn create_header_bar(state: &Rc<RefCell<AppState>>) -> HeaderComponents {
     end_box.append(&delay_controls);
     end_box.append(&menu_btn);
 
-    // Build the header bar
+    
     let header_bar = adw::HeaderBar::builder().title_widget(&title_box).build();
     header_bar.pack_start(&take_screenshot_btn);
     header_bar.pack_end(&end_box);
@@ -125,7 +125,7 @@ pub fn create_header_bar(state: &Rc<RefCell<AppState>>) -> HeaderComponents {
     }
 }
 
-/// Connect the mode toggle buttons to update state
+
 fn connect_mode_toggles(
     state: &Rc<RefCell<AppState>>,
     mode_selection: &gtk::ToggleButton,
@@ -160,7 +160,7 @@ fn connect_mode_toggles(
     });
 }
 
-/// Connect the delay control buttons
+
 fn connect_delay_controls(
     state: &Rc<RefCell<AppState>>,
     delay_value: &gtk::Label,

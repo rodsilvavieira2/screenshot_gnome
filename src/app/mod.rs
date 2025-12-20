@@ -1,6 +1,6 @@
-//! Application module
-//!
-//! This module contains the core application state and logic.
+
+
+
 
 mod state;
 
