@@ -1,0 +1,551 @@
+//! Event handlers module
+//!
+//! This module contains all the event handler connections for the UI components,
+//! including drag/click handlers for drawing, undo/copy/save actions, and
+//! capture/crop confirmation handlers.
+
+use gtk4 as gtk;
+use libadwaita as adw;
+
+use gtk::{GestureClick, GestureDrag};
+use gtk4::prelude::*;
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::time::Duration;
+
+use crate::app::{AppState, CaptureMode};
+use crate::capture::capture_primary_monitor;
+use crate::editor::{
+    Annotation, ClipboardManager, EditorTool, FreeDrawAnnotation, RectangleAnnotation,
+    pick_color_from_pixbuf,
+};
+use crate::ui::dialogs::{TextPopoverComponents, show_window_selector};
+use crate::ui::drawing::DrawingComponents;
+use crate::ui::header::HeaderComponents;
+use crate::ui::toolbar::{CropToolbarComponents, ToolbarComponents};
+
+/// Container for all UI components needed by handlers
+pub struct UiComponents {
+    pub window: adw::ApplicationWindow,
+    pub header: HeaderComponents,
+    pub toolbar: ToolbarComponents,
+    pub crop_toolbar: CropToolbarComponents,
+    pub drawing: DrawingComponents,
+    pub text_popover: TextPopoverComponents,
+}
+
+/// Connect the undo button handler
+pub fn connect_undo_handler(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
+    components.toolbar.undo_btn.connect_clicked({
+        let state = state.clone();
+        let drawing_area = components.drawing.drawing_area.clone();
+        move |_| {
+            let mut s = state.borrow_mut();
+            s.editor.undo();
+            drop(s);
+            drawing_area.queue_draw();
+        }
+    });
+}
+
+/// Connect the copy to clipboard handler
+pub fn connect_copy_handler(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
+    components.toolbar.copy_btn.connect_clicked({
+        let state = state.clone();
+        let window = components.window.clone();
+        move |_| {
+            let s = state.borrow();
+            if let Some(ref pixbuf) = s.final_image {
+                let clipboard_manager = ClipboardManager::from_widget(&window);
+                if clipboard_manager.copy_image(pixbuf).is_ok() {
+                    println!("Image copied to clipboard");
+                }
+            }
+        }
+    });
+}
+
+/// Connect the drag controller for drawing and selection
+pub fn connect_drag_handlers(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
+    let drag = GestureDrag::new();
+
+    // Drag begin handler
+    drag.connect_drag_begin({
+        let state = state.clone();
+        let drawing_area = components.drawing.drawing_area.clone();
+        move |_, x, y| {
+            handle_drag_begin(&state, &drawing_area, x, y);
+        }
+    });
+
+    // Drag update handler
+    drag.connect_drag_update({
+        let state = state.clone();
+        let drawing_area = components.drawing.drawing_area.clone();
+        move |gesture, offset_x, offset_y| {
+            handle_drag_update(&state, &drawing_area, gesture, offset_x, offset_y);
+        }
+    });
+
+    // Drag end handler
+    drag.connect_drag_end({
+        let state = state.clone();
+        let drawing_area = components.drawing.drawing_area.clone();
+        move |gesture, offset_x, offset_y| {
+            handle_drag_end(&state, &drawing_area, gesture, offset_x, offset_y);
+        }
+    });
+
+    components.drawing.drawing_area.add_controller(drag);
+}
+
+/// Handle the start of a drag operation
+fn handle_drag_begin(
+    state: &Rc<RefCell<AppState>>,
+    drawing_area: &gtk::DrawingArea,
+    x: f64,
+    y: f64,
+) {
+    let mut s = state.borrow_mut();
+
+    // Handle capture selection mode
+    if s.is_active && s.mode == CaptureMode::Selection {
+        s.start_selection(x, y);
+        drop(s);
+        drawing_area.queue_draw();
+        return;
+    }
+
+    // Handle editor tools
+    if s.final_image.is_some() {
+        let tool = s.editor.current_tool();
+        match tool {
+            EditorTool::Pointer => {
+                s.editor.pointer_drag_start(x, y);
+            }
+            EditorTool::Pencil => {
+                let (img_x, img_y) = s.editor.display_to_image_coords(x, y);
+                s.editor.tool_state.start_drag(img_x, img_y);
+                let mut free_draw = FreeDrawAnnotation::new(
+                    s.editor.tool_state.color,
+                    s.editor.tool_state.line_width,
+                );
+                free_draw.add_point(img_x, img_y);
+                s.editor
+                    .annotations
+                    .set_current(Some(Annotation::FreeDraw(free_draw)));
+            }
+            EditorTool::Rectangle => {
+                let (img_x, img_y) = s.editor.display_to_image_coords(x, y);
+                s.editor.tool_state.start_drag(img_x, img_y);
+            }
+            EditorTool::Crop => {
+                let (img_x, img_y) = s.editor.display_to_image_coords(x, y);
+                s.editor.tool_state.start_drag(img_x, img_y);
+            }
+            _ => {}
+        }
+        drop(s);
+        drawing_area.queue_draw();
+    }
+}
+
+/// Handle drag update during a drag operation
+fn handle_drag_update(
+    state: &Rc<RefCell<AppState>>,
+    drawing_area: &gtk::DrawingArea,
+    gesture: &GestureDrag,
+    offset_x: f64,
+    offset_y: f64,
+) {
+    let mut s = state.borrow_mut();
+
+    // Handle capture selection mode
+    if s.is_active && s.mode == CaptureMode::Selection {
+        if let Some(ref sel) = s.selection {
+            let end_x = sel.start_x + offset_x;
+            let end_y = sel.start_y + offset_y;
+            s.update_selection(end_x, end_y);
+            drop(s);
+            drawing_area.queue_draw();
+        }
+        return;
+    }
+
+    // Handle editor tools
+    if s.final_image.is_some() {
+        let tool = s.editor.current_tool();
+
+        if let Some((start_x, start_y)) = gesture.start_point() {
+            let current_x = start_x + offset_x;
+            let current_y = start_y + offset_y;
+            let (img_x, img_y) = s.editor.display_to_image_coords(current_x, current_y);
+
+            match tool {
+                EditorTool::Pointer => {
+                    s.editor.pointer_drag_update(current_x, current_y);
+                }
+                EditorTool::Pencil => {
+                    s.editor.tool_state.update_drag(img_x, img_y);
+                    if let Some(Annotation::FreeDraw(ref draw)) =
+                        s.editor.annotations.current().cloned()
+                    {
+                        let mut draw = draw.clone();
+                        draw.add_point(img_x, img_y);
+                        s.editor
+                            .annotations
+                            .set_current(Some(Annotation::FreeDraw(draw)));
+                    }
+                }
+                EditorTool::Rectangle => {
+                    s.editor.tool_state.update_drag(img_x, img_y);
+                    if let (Some((start_x, start_y)), Some((end_x, end_y))) = (
+                        s.editor.tool_state.drag_start,
+                        s.editor.tool_state.drag_current,
+                    ) {
+                        let rect = RectangleAnnotation::from_corners(
+                            start_x,
+                            start_y,
+                            end_x,
+                            end_y,
+                            s.editor.tool_state.color,
+                            s.editor.tool_state.line_width,
+                        );
+                        s.editor
+                            .annotations
+                            .set_current(Some(Annotation::Rectangle(rect)));
+                    }
+                }
+                EditorTool::Crop => {
+                    s.editor.tool_state.update_drag(img_x, img_y);
+                }
+                _ => {}
+            }
+        }
+        drop(s);
+        drawing_area.queue_draw();
+    }
+}
+
+/// Handle the end of a drag operation
+fn handle_drag_end(
+    state: &Rc<RefCell<AppState>>,
+    drawing_area: &gtk::DrawingArea,
+    gesture: &GestureDrag,
+    offset_x: f64,
+    offset_y: f64,
+) {
+    let mut s = state.borrow_mut();
+
+    // Handle capture selection mode
+    if s.is_active && s.mode == CaptureMode::Selection {
+        if let Some(ref sel) = s.selection {
+            let end_x = sel.start_x + offset_x;
+            let end_y = sel.start_y + offset_y;
+            s.update_selection(end_x, end_y);
+            drop(s);
+            drawing_area.queue_draw();
+        }
+        return;
+    }
+
+    // Handle editor tools
+    if s.final_image.is_some() {
+        let tool = s.editor.current_tool();
+
+        if let Some((start_x, start_y)) = gesture.start_point() {
+            let current_x = start_x + offset_x;
+            let current_y = start_y + offset_y;
+            let (img_x, img_y) = s.editor.display_to_image_coords(current_x, current_y);
+
+            match tool {
+                EditorTool::Pointer => {
+                    s.editor.pointer_drag_end();
+                }
+                EditorTool::Pencil => {
+                    s.editor.tool_state.update_drag(img_x, img_y);
+                    s.editor.annotations.commit_current();
+                    s.editor.tool_state.end_drag();
+                }
+                EditorTool::Rectangle => {
+                    s.editor.tool_state.update_drag(img_x, img_y);
+                    s.editor.annotations.commit_current();
+                    s.editor.tool_state.end_drag();
+                }
+                EditorTool::Crop => {
+                    // Keep the drag state for crop confirmation
+                    s.editor.tool_state.update_drag(img_x, img_y);
+                }
+                _ => {}
+            }
+        }
+        drop(s);
+        drawing_area.queue_draw();
+    }
+}
+
+/// Connect the click controller for color picker and text tool
+pub fn connect_click_handlers(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
+    let click = GestureClick::new();
+    click.set_button(1); // Left click
+
+    click.connect_released({
+        let state = state.clone();
+        let drawing_area = components.drawing.drawing_area.clone();
+        let picked_color_label = components.drawing.picked_color_label.clone();
+        let color_button = components.toolbar.color_button.clone();
+        let color_picker_circle = components.toolbar.color_picker_circle.clone();
+        let text_popover = components.text_popover.text_popover.clone();
+        let text_entry = components.text_popover.text_entry.clone();
+        move |_, _, x, y| {
+            let mut s = state.borrow_mut();
+
+            if s.final_image.is_none() || s.is_active {
+                return;
+            }
+
+            let tool = s.editor.current_tool();
+
+            match tool {
+                EditorTool::ColorPicker => {
+                    if let Some(ref pixbuf) = s.final_image.clone() {
+                        let (img_x, img_y) = s.editor.display_to_image_coords(x, y);
+                        if let Ok(picked) =
+                            pick_color_from_pixbuf(&pixbuf, img_x as i32, img_y as i32)
+                        {
+                            let color = picked.color;
+                            let hex = picked.to_hex();
+                            s.editor.set_color(color);
+                            s.editor.color_picker.set_picked_color(picked);
+                            drop(s);
+
+                            // Update UI
+                            picked_color_label.set_text(&format!("Color: {}", hex));
+                            color_button.set_rgba(&color);
+                            color_picker_circle.queue_draw();
+                            drawing_area.queue_draw();
+                        }
+                    }
+                }
+                EditorTool::Text => {
+                    let (img_x, img_y) = s.editor.display_to_image_coords(x, y);
+                    s.editor.pending_text = Some(crate::editor::PendingText {
+                        x: img_x,
+                        y: img_y,
+                        text: String::new(),
+                    });
+                    drop(s);
+
+                    // Show text input popover
+                    text_entry.set_text("");
+                    let rect = gtk::gdk::Rectangle::new(x as i32, y as i32, 1, 1);
+                    text_popover.set_pointing_to(Some(&rect));
+                    text_popover.popup();
+                    text_entry.grab_focus();
+
+                    drawing_area.queue_draw();
+                }
+                _ => {}
+            }
+        }
+    });
+
+    components.drawing.drawing_area.add_controller(click);
+}
+
+/// Connect the crop confirm/cancel handlers
+pub fn connect_crop_handlers(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
+    // Confirm button
+    components.crop_toolbar.confirm_btn.connect_clicked({
+        let state = state.clone();
+        let drawing_area = components.drawing.drawing_area.clone();
+        let window = components.window.clone();
+        let header_bar = components.header.header_bar.clone();
+        let tools_box = components.toolbar.tools_box.clone();
+        let crop_tools_box = components.crop_toolbar.crop_tools_box.clone();
+        let tool_pointer_btn = components.toolbar.tool_pointer_btn.clone();
+
+        move |_| {
+            let mut s = state.borrow_mut();
+
+            // Handle capture selection mode confirmation
+            if s.is_active && s.mode == CaptureMode::Selection {
+                s.apply_selection_crop();
+                s.exit_capture_mode();
+
+                // Restore UI
+                window.unfullscreen();
+                header_bar.set_visible(true);
+                tools_box.set_visible(true);
+                crop_tools_box.set_visible(false);
+
+                drop(s);
+                drawing_area.queue_draw();
+                return;
+            }
+
+            // Handle editor crop mode confirmation
+            if s.is_crop_mode {
+                s.apply_editor_crop();
+                s.exit_crop_mode();
+                s.editor.set_tool(EditorTool::Pointer);
+                drop(s);
+
+                tool_pointer_btn.set_active(true);
+                tools_box.set_visible(true);
+                crop_tools_box.set_visible(false);
+                drawing_area.queue_draw();
+            }
+        }
+    });
+
+    // Cancel button
+    components.crop_toolbar.cancel_btn.connect_clicked({
+        let state = state.clone();
+        let drawing_area = components.drawing.drawing_area.clone();
+        let window = components.window.clone();
+        let header_bar = components.header.header_bar.clone();
+        let tools_box = components.toolbar.tools_box.clone();
+        let crop_tools_box = components.crop_toolbar.crop_tools_box.clone();
+        let placeholder_icon = components.drawing.placeholder_icon.clone();
+        let tool_pointer_btn = components.toolbar.tool_pointer_btn.clone();
+
+        move |_| {
+            let mut s = state.borrow_mut();
+
+            // Handle capture selection mode cancel
+            if s.is_active {
+                s.is_active = false;
+                s.selection = None;
+
+                window.unfullscreen();
+                header_bar.set_visible(true);
+                tools_box.set_visible(true);
+                crop_tools_box.set_visible(false);
+
+                if s.final_image.is_none() {
+                    placeholder_icon.set_visible(true);
+                }
+
+                drop(s);
+                drawing_area.queue_draw();
+                return;
+            }
+
+            // Handle editor crop mode cancel
+            if s.is_crop_mode {
+                s.exit_crop_mode();
+                s.editor.set_tool(EditorTool::Pointer);
+                drop(s);
+
+                tool_pointer_btn.set_active(true);
+                tools_box.set_visible(true);
+                crop_tools_box.set_visible(false);
+                drawing_area.queue_draw();
+            }
+        }
+    });
+}
+
+/// Connect the take screenshot button handler
+pub fn connect_screenshot_handler(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
+    components.header.take_screenshot_btn.connect_clicked({
+        let state = state.clone();
+        let drawing_area = components.drawing.drawing_area.clone();
+        let placeholder_icon = components.drawing.placeholder_icon.clone();
+        let window = components.window.clone();
+        let header_bar = components.header.header_bar.clone();
+        let tools_box = components.toolbar.tools_box.clone();
+        let crop_tools_box = components.crop_toolbar.crop_tools_box.clone();
+
+        move |_| {
+            let mode = state.borrow().mode;
+
+            if mode == CaptureMode::Window {
+                // Show window selector dialog
+                show_window_selector(&state, &window, &drawing_area, &placeholder_icon);
+            } else {
+                // Screen or Selection Mode
+                capture_screen_or_selection(
+                    &state,
+                    &window,
+                    &header_bar,
+                    &tools_box,
+                    &crop_tools_box,
+                    &drawing_area,
+                    &placeholder_icon,
+                    mode,
+                );
+            }
+        }
+    });
+}
+
+/// Perform screen or selection capture
+fn capture_screen_or_selection(
+    state: &Rc<RefCell<AppState>>,
+    window: &adw::ApplicationWindow,
+    header_bar: &adw::HeaderBar,
+    tools_box: &gtk::Box,
+    crop_tools_box: &gtk::Box,
+    drawing_area: &gtk::DrawingArea,
+    placeholder_icon: &gtk::Image,
+    mode: CaptureMode,
+) {
+    // Hide window before capture
+    window.set_visible(false);
+
+    // Process pending events and wait for window to hide
+    let context = gtk::glib::MainContext::default();
+    while context.pending() {
+        context.iteration(false);
+    }
+    std::thread::sleep(Duration::from_millis(200));
+
+    // Capture using the capture module
+    match capture_primary_monitor() {
+        Ok(result) => {
+            let mut s = state.borrow_mut();
+            s.monitor_x = result.monitor_info.x;
+            s.monitor_y = result.monitor_info.y;
+            s.editor.reset();
+
+            if mode == CaptureMode::Screen {
+                // Full screen capture
+                s.final_image = Some(result.pixbuf);
+                s.is_active = false;
+                window.set_visible(true);
+                placeholder_icon.set_visible(false);
+                drawing_area.queue_draw();
+            } else {
+                // Selection mode - show overlay for selection
+                s.original_screenshot = Some(result.pixbuf);
+                s.is_active = true;
+                s.selection = None;
+
+                placeholder_icon.set_visible(false);
+                header_bar.set_visible(false);
+                tools_box.set_visible(false);
+                crop_tools_box.set_visible(true);
+
+                window.set_visible(true);
+                window.fullscreen();
+                drawing_area.queue_draw();
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to capture screen: {}", e);
+            window.set_visible(true);
+        }
+    }
+}
+
+/// Connect all event handlers
+pub fn connect_all_handlers(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
+    connect_undo_handler(state, components);
+    connect_copy_handler(state, components);
+    connect_drag_handlers(state, components);
+    connect_click_handlers(state, components);
+    connect_crop_handlers(state, components);
+    connect_screenshot_handler(state, components);
+}
