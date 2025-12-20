@@ -8,6 +8,7 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::app::{AppState, CaptureMode};
 use crate::capture::capture_primary_monitor;
@@ -70,8 +71,15 @@ pub fn connect_save_handler(state: &Rc<RefCell<AppState>>, components: &UiCompon
                 match dialog.select_folder_future(Some(&window)).await {
                     Ok(folder) => {
                         if let Some(folder_path) = folder.path() {
+                            let timestamp = SystemTime::now().duration_since(UNIX_EPOCH);
+
+                            let value_in_secs_timestamp = match timestamp {
+                                Ok(dur) => dur.as_secs(),
+                                Err(_) => 0,
+                            };
+
                             let mut path = PathBuf::from(folder_path);
-                            path.push("screenshot.png");
+                            path.push(format!("screenshot_{}.png", value_in_secs_timestamp));
                             let s = state.borrow();
                             if let Some(ref pixbuf) = s.final_image {
                                 if let Err(e) = pixbuf.savev(path.to_str().unwrap(), "png", &[]) {
