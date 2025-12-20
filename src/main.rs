@@ -1,11 +1,3 @@
-//! GNOME Snapper - A screenshot capture and editing application
-//!
-//! This application provides:
-//! - Multiple capture modes (Selection, Window, Screen)
-//! - Annotation tools (Free draw, Rectangle, Text)
-//! - Image editing (Crop, Color picker)
-//! - Clipboard and save functionality
-
 use libadwaita as adw;
 
 use adw::prelude::*;
