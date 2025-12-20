@@ -1,8 +1,3 @@
-
-
-
-
-
 use gtk4 as gtk;
 
 use gtk::{Align, Orientation};
@@ -13,14 +8,12 @@ use std::rc::Rc;
 use crate::app::AppState;
 use crate::capture::{capture_window_by_id, list_capturable_windows};
 
-
 pub struct TextPopoverComponents {
     pub text_popover: gtk::Popover,
     pub text_entry: gtk::Entry,
     pub text_confirm_btn: gtk::Button,
     pub text_cancel_btn: gtk::Button,
 }
-
 
 pub fn create_text_popover(drawing_area: &gtk::DrawingArea) -> TextPopoverComponents {
     let text_entry = gtk::Entry::builder()
@@ -65,13 +58,11 @@ pub fn create_text_popover(drawing_area: &gtk::DrawingArea) -> TextPopoverCompon
     }
 }
 
-
 pub fn connect_text_popover(
     state: &Rc<RefCell<AppState>>,
     drawing_area: &gtk::DrawingArea,
     components: &TextPopoverComponents,
 ) {
-    
     components.text_confirm_btn.connect_clicked({
         let state = state.clone();
         let drawing_area = drawing_area.clone();
@@ -87,7 +78,6 @@ pub fn connect_text_popover(
         }
     });
 
-    
     components.text_cancel_btn.connect_clicked({
         let state = state.clone();
         let drawing_area = drawing_area.clone();
@@ -101,7 +91,6 @@ pub fn connect_text_popover(
         }
     });
 
-    
     components.text_entry.connect_activate({
         let state = state.clone();
         let drawing_area = drawing_area.clone();
@@ -117,7 +106,6 @@ pub fn connect_text_popover(
         }
     });
 }
-
 
 pub fn show_window_selector(
     state: &Rc<RefCell<AppState>>,
@@ -156,13 +144,10 @@ pub fn show_window_selector(
     vbox.append(&scrolled_window);
     window_selector.set_child(Some(&vbox));
 
-    
     let window_ids: Rc<RefCell<Vec<u32>>> = Rc::new(RefCell::new(Vec::new()));
 
-    
     if let Ok(windows) = list_capturable_windows() {
         for win_info in &windows {
-            
             window_ids.borrow_mut().push(win_info.id);
 
             let row = gtk::Box::builder()
@@ -170,13 +155,11 @@ pub fn show_window_selector(
                 .spacing(12)
                 .build();
 
-            
             let icon = gtk::Image::builder()
                 .icon_name(win_info.icon_name_hint().to_lowercase())
                 .pixel_size(32)
                 .build();
 
-            
             let label = gtk::Label::builder()
                 .label(&win_info.display_label())
                 .halign(Align::Start)
@@ -190,7 +173,6 @@ pub fn show_window_selector(
         }
     }
 
-    
     list_box.connect_row_activated({
         let state = state.clone();
         let drawing_area = drawing_area.clone();
@@ -200,10 +182,8 @@ pub fn show_window_selector(
         move |_lb, row| {
             let idx = row.index();
             if idx >= 0 {
-                
                 let ids = window_ids.borrow();
                 if let Some(&window_id) = ids.get(idx as usize) {
-                    
                     if let Ok(result) = capture_window_by_id(window_id) {
                         let mut s = state.borrow_mut();
                         s.final_image = Some(result.pixbuf);

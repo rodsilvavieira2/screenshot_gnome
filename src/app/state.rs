@@ -1,25 +1,18 @@
-
-
-
-
 #![allow(dead_code)]
 
 use gtk4 as gtk;
 
 use crate::editor::EditorState;
 
-
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CaptureMode {
-    
     #[default]
     Selection,
-    
+
     Window,
-    
+
     Screen,
 }
-
 
 #[derive(Default, Clone, Copy, Debug)]
 pub struct Selection {
@@ -30,7 +23,6 @@ pub struct Selection {
 }
 
 impl Selection {
-    
     pub fn new(start_x: f64, start_y: f64) -> Self {
         Self {
             start_x,
@@ -40,13 +32,11 @@ impl Selection {
         }
     }
 
-    
     pub fn update_end(&mut self, end_x: f64, end_y: f64) {
         self.end_x = end_x;
         self.end_y = end_y;
     }
 
-    
     pub fn rectangle(&self) -> gtk::gdk::Rectangle {
         let x = self.start_x.min(self.end_x) as i32;
         let y = self.start_y.min(self.end_y) as i32;
@@ -55,34 +45,31 @@ impl Selection {
         gtk::gdk::Rectangle::new(x, y, w, h)
     }
 
-    
     pub fn is_significant(&self) -> bool {
         let rect = self.rectangle();
         rect.width() > 10 && rect.height() > 10
     }
 }
 
-
 pub struct AppState {
-    
     pub mode: CaptureMode,
-    
+
     pub original_screenshot: Option<gtk::gdk_pixbuf::Pixbuf>,
-    
+
     pub final_image: Option<gtk::gdk_pixbuf::Pixbuf>,
-    
+
     pub selection: Option<Selection>,
-    
+
     pub is_active: bool,
-    
+
     pub monitor_x: i32,
-    
+
     pub monitor_y: i32,
-    
+
     pub editor: EditorState,
-    
+
     pub is_crop_mode: bool,
-    
+
     pub delay_seconds: u32,
 }
 
@@ -93,7 +80,6 @@ impl Default for AppState {
 }
 
 impl AppState {
-    
     pub fn new() -> Self {
         Self {
             mode: CaptureMode::Selection,
@@ -109,7 +95,6 @@ impl AppState {
         }
     }
 
-    
     pub fn reset_for_capture(&mut self) {
         self.selection = None;
         self.is_active = false;
@@ -117,24 +102,20 @@ impl AppState {
         self.editor.reset();
     }
 
-    
     pub fn start_selection(&mut self, x: f64, y: f64) {
         self.selection = Some(Selection::new(x, y));
     }
 
-    
     pub fn update_selection(&mut self, end_x: f64, end_y: f64) {
         if let Some(ref mut sel) = self.selection {
             sel.update_end(end_x, end_y);
         }
     }
 
-    
     pub fn has_image(&self) -> bool {
         self.final_image.is_some()
     }
 
-    
     pub fn current_display_image(&self) -> Option<&gtk::gdk_pixbuf::Pixbuf> {
         if self.is_active {
             self.original_screenshot.as_ref()
@@ -143,7 +124,6 @@ impl AppState {
         }
     }
 
-    
     pub fn apply_selection_crop(&mut self) -> bool {
         if let Some(sel) = self.selection {
             if sel.is_significant() {
@@ -165,7 +145,6 @@ impl AppState {
         false
     }
 
-    
     pub fn apply_editor_crop(&mut self) -> bool {
         if let Some((x, y, w, h)) = self.editor.tool_state.get_drag_rect() {
             if w > 10.0 && h > 10.0 {
@@ -187,27 +166,23 @@ impl AppState {
         false
     }
 
-    
     pub fn exit_capture_mode(&mut self) {
         self.is_active = false;
         self.selection = None;
         self.editor.reset();
     }
 
-    
     pub fn exit_crop_mode(&mut self) {
         self.is_crop_mode = false;
         self.editor.tool_state.reset_drag();
     }
 
-    
     pub fn increment_delay(&mut self) {
         if self.delay_seconds < 10 {
             self.delay_seconds += 1;
         }
     }
 
-    
     pub fn decrement_delay(&mut self) {
         if self.delay_seconds > 0 {
             self.delay_seconds -= 1;

@@ -1,6 +1,5 @@
 use gtk4::gdk::RGBA;
 
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum EditorTool {
     #[default]
@@ -13,7 +12,6 @@ pub enum EditorTool {
 }
 
 impl EditorTool {
-    
     pub fn icon_name(&self) -> &'static str {
         match self {
             EditorTool::Pointer => "input-mouse-symbolic",
@@ -25,7 +23,6 @@ impl EditorTool {
         }
     }
 
-    
     pub fn tooltip(&self) -> &'static str {
         match self {
             EditorTool::Pointer => "Pointer",
@@ -37,7 +34,6 @@ impl EditorTool {
         }
     }
 
-    
     pub fn all() -> &'static [EditorTool] {
         &[
             EditorTool::Pointer,
@@ -50,26 +46,24 @@ impl EditorTool {
     }
 }
 
-
 #[derive(Clone, Debug)]
 pub struct ToolState {
-    
     pub active_tool: EditorTool,
-    
+
     pub color: RGBA,
-    
+
     pub line_width: f64,
-    
+
     pub font_size: f64,
-    
+
     pub is_drawing: bool,
-    
+
     pub drag_start: Option<(f64, f64)>,
-    
+
     pub drag_current: Option<(f64, f64)>,
-    
+
     pub pointer_drag_offset: Option<(f64, f64)>,
-    
+
     pub is_dragging_annotation: bool,
 }
 
@@ -77,7 +71,7 @@ impl Default for ToolState {
     fn default() -> Self {
         Self {
             active_tool: EditorTool::Pointer,
-            color: RGBA::new(1.0, 0.0, 0.0, 1.0), 
+            color: RGBA::new(1.0, 0.0, 0.0, 1.0),
             line_width: 3.0,
             font_size: 24.0,
             is_drawing: false,
@@ -141,7 +135,6 @@ impl ToolState {
         self.is_dragging_annotation = false;
     }
 
-    
     pub fn start_annotation_drag(
         &mut self,
         click_x: f64,
@@ -152,18 +145,16 @@ impl ToolState {
         self.is_dragging_annotation = true;
         self.drag_start = Some((click_x, click_y));
         self.drag_current = Some((click_x, click_y));
-        
+
         self.pointer_drag_offset = Some((click_x - annotation_x, click_y - annotation_y));
     }
 
-    
     pub fn update_annotation_drag(&mut self, x: f64, y: f64) {
         if self.is_dragging_annotation {
             self.drag_current = Some((x, y));
         }
     }
 
-    
     pub fn end_annotation_drag(&mut self) -> Option<(f64, f64)> {
         if self.is_dragging_annotation {
             if let (Some((current_x, current_y)), Some((offset_x, offset_y))) =
@@ -179,7 +170,6 @@ impl ToolState {
         None
     }
 
-    
     pub fn get_drag_rect(&self) -> Option<(f64, f64, f64, f64)> {
         if let (Some((x1, y1)), Some((x2, y2))) = (self.drag_start, self.drag_current) {
             let x = x1.min(x2);

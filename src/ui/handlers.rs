@@ -1,9 +1,3 @@
-
-
-
-
-
-
 use gtk4 as gtk;
 use libadwaita as adw;
 
@@ -16,14 +10,13 @@ use std::time::Duration;
 use crate::app::{AppState, CaptureMode};
 use crate::capture::capture_primary_monitor;
 use crate::editor::{
-    Annotation, ClipboardManager, EditorTool, FreeDrawAnnotation, RectangleAnnotation,
-    pick_color_from_pixbuf,
+    pick_color_from_pixbuf, Annotation, ClipboardManager, EditorTool, FreeDrawAnnotation,
+    RectangleAnnotation,
 };
-use crate::ui::dialogs::{TextPopoverComponents, show_window_selector};
+use crate::ui::dialogs::{show_window_selector, TextPopoverComponents};
 use crate::ui::drawing::DrawingComponents;
 use crate::ui::header::HeaderComponents;
 use crate::ui::toolbar::{CropToolbarComponents, ToolbarComponents};
-
 
 pub struct UiComponents {
     pub window: adw::ApplicationWindow,
@@ -33,7 +26,6 @@ pub struct UiComponents {
     pub drawing: DrawingComponents,
     pub text_popover: TextPopoverComponents,
 }
-
 
 pub fn connect_undo_handler(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
     components.toolbar.undo_btn.connect_clicked({
@@ -47,7 +39,6 @@ pub fn connect_undo_handler(state: &Rc<RefCell<AppState>>, components: &UiCompon
         }
     });
 }
-
 
 pub fn connect_copy_handler(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
     components.toolbar.copy_btn.connect_clicked({
@@ -65,11 +56,9 @@ pub fn connect_copy_handler(state: &Rc<RefCell<AppState>>, components: &UiCompon
     });
 }
 
-
 pub fn connect_drag_handlers(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
     let drag = GestureDrag::new();
 
-    
     drag.connect_drag_begin({
         let state = state.clone();
         let drawing_area = components.drawing.drawing_area.clone();
@@ -78,7 +67,6 @@ pub fn connect_drag_handlers(state: &Rc<RefCell<AppState>>, components: &UiCompo
         }
     });
 
-    
     drag.connect_drag_update({
         let state = state.clone();
         let drawing_area = components.drawing.drawing_area.clone();
@@ -87,7 +75,6 @@ pub fn connect_drag_handlers(state: &Rc<RefCell<AppState>>, components: &UiCompo
         }
     });
 
-    
     drag.connect_drag_end({
         let state = state.clone();
         let drawing_area = components.drawing.drawing_area.clone();
@@ -99,7 +86,6 @@ pub fn connect_drag_handlers(state: &Rc<RefCell<AppState>>, components: &UiCompo
     components.drawing.drawing_area.add_controller(drag);
 }
 
-
 fn handle_drag_begin(
     state: &Rc<RefCell<AppState>>,
     drawing_area: &gtk::DrawingArea,
@@ -108,7 +94,6 @@ fn handle_drag_begin(
 ) {
     let mut s = state.borrow_mut();
 
-    
     if s.is_active && s.mode == CaptureMode::Selection {
         s.start_selection(x, y);
         drop(s);
@@ -116,7 +101,6 @@ fn handle_drag_begin(
         return;
     }
 
-    
     if s.final_image.is_some() {
         let tool = s.editor.current_tool();
         match tool {
@@ -150,7 +134,6 @@ fn handle_drag_begin(
     }
 }
 
-
 fn handle_drag_update(
     state: &Rc<RefCell<AppState>>,
     drawing_area: &gtk::DrawingArea,
@@ -160,7 +143,6 @@ fn handle_drag_update(
 ) {
     let mut s = state.borrow_mut();
 
-    
     if s.is_active && s.mode == CaptureMode::Selection {
         if let Some(ref sel) = s.selection {
             let end_x = sel.start_x + offset_x;
@@ -172,7 +154,6 @@ fn handle_drag_update(
         return;
     }
 
-    
     if s.final_image.is_some() {
         let tool = s.editor.current_tool();
 
@@ -227,7 +208,6 @@ fn handle_drag_update(
     }
 }
 
-
 fn handle_drag_end(
     state: &Rc<RefCell<AppState>>,
     drawing_area: &gtk::DrawingArea,
@@ -237,7 +217,6 @@ fn handle_drag_end(
 ) {
     let mut s = state.borrow_mut();
 
-    
     if s.is_active && s.mode == CaptureMode::Selection {
         if let Some(ref sel) = s.selection {
             let end_x = sel.start_x + offset_x;
@@ -249,7 +228,6 @@ fn handle_drag_end(
         return;
     }
 
-    
     if s.final_image.is_some() {
         let tool = s.editor.current_tool();
 
@@ -273,7 +251,6 @@ fn handle_drag_end(
                     s.editor.tool_state.end_drag();
                 }
                 EditorTool::Crop => {
-                    
                     s.editor.tool_state.update_drag(img_x, img_y);
                 }
                 _ => {}
@@ -284,10 +261,9 @@ fn handle_drag_end(
     }
 }
 
-
 pub fn connect_click_handlers(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
     let click = GestureClick::new();
-    click.set_button(1); 
+    click.set_button(1);
 
     click.connect_released({
         let state = state.clone();
@@ -319,7 +295,6 @@ pub fn connect_click_handlers(state: &Rc<RefCell<AppState>>, components: &UiComp
                             s.editor.color_picker.set_picked_color(picked);
                             drop(s);
 
-                            
                             picked_color_label.set_text(&format!("Color: {}", hex));
                             color_button.set_rgba(&color);
                             color_picker_circle.queue_draw();
@@ -336,7 +311,6 @@ pub fn connect_click_handlers(state: &Rc<RefCell<AppState>>, components: &UiComp
                     });
                     drop(s);
 
-                    
                     text_entry.set_text("");
                     let rect = gtk::gdk::Rectangle::new(x as i32, y as i32, 1, 1);
                     text_popover.set_pointing_to(Some(&rect));
@@ -353,9 +327,7 @@ pub fn connect_click_handlers(state: &Rc<RefCell<AppState>>, components: &UiComp
     components.drawing.drawing_area.add_controller(click);
 }
 
-
 pub fn connect_crop_handlers(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
-    
     components.crop_toolbar.confirm_btn.connect_clicked({
         let state = state.clone();
         let drawing_area = components.drawing.drawing_area.clone();
@@ -368,12 +340,10 @@ pub fn connect_crop_handlers(state: &Rc<RefCell<AppState>>, components: &UiCompo
         move |_| {
             let mut s = state.borrow_mut();
 
-            
             if s.is_active && s.mode == CaptureMode::Selection {
                 s.apply_selection_crop();
                 s.exit_capture_mode();
 
-                
                 window.unfullscreen();
                 header_bar.set_visible(true);
                 tools_box.set_visible(true);
@@ -384,7 +354,6 @@ pub fn connect_crop_handlers(state: &Rc<RefCell<AppState>>, components: &UiCompo
                 return;
             }
 
-            
             if s.is_crop_mode {
                 s.apply_editor_crop();
                 s.exit_crop_mode();
@@ -399,7 +368,6 @@ pub fn connect_crop_handlers(state: &Rc<RefCell<AppState>>, components: &UiCompo
         }
     });
 
-    
     components.crop_toolbar.cancel_btn.connect_clicked({
         let state = state.clone();
         let drawing_area = components.drawing.drawing_area.clone();
@@ -413,7 +381,6 @@ pub fn connect_crop_handlers(state: &Rc<RefCell<AppState>>, components: &UiCompo
         move |_| {
             let mut s = state.borrow_mut();
 
-            
             if s.is_active {
                 s.is_active = false;
                 s.selection = None;
@@ -432,7 +399,6 @@ pub fn connect_crop_handlers(state: &Rc<RefCell<AppState>>, components: &UiCompo
                 return;
             }
 
-            
             if s.is_crop_mode {
                 s.exit_crop_mode();
                 s.editor.set_tool(EditorTool::Pointer);
@@ -446,7 +412,6 @@ pub fn connect_crop_handlers(state: &Rc<RefCell<AppState>>, components: &UiCompo
         }
     });
 }
-
 
 pub fn connect_screenshot_handler(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
     components.header.take_screenshot_btn.connect_clicked({
@@ -462,10 +427,8 @@ pub fn connect_screenshot_handler(state: &Rc<RefCell<AppState>>, components: &Ui
             let mode = state.borrow().mode;
 
             if mode == CaptureMode::Window {
-                
                 show_window_selector(&state, &window, &drawing_area, &placeholder_icon);
             } else {
-                
                 capture_screen_or_selection(
                     &state,
                     &window,
@@ -481,7 +444,6 @@ pub fn connect_screenshot_handler(state: &Rc<RefCell<AppState>>, components: &Ui
     });
 }
 
-
 fn capture_screen_or_selection(
     state: &Rc<RefCell<AppState>>,
     window: &adw::ApplicationWindow,
@@ -492,17 +454,14 @@ fn capture_screen_or_selection(
     placeholder_icon: &gtk::Image,
     mode: CaptureMode,
 ) {
-    
     window.set_visible(false);
 
-    
     let context = gtk::glib::MainContext::default();
     while context.pending() {
         context.iteration(false);
     }
     std::thread::sleep(Duration::from_millis(200));
 
-    
     match capture_primary_monitor() {
         Ok(result) => {
             let mut s = state.borrow_mut();
@@ -511,14 +470,12 @@ fn capture_screen_or_selection(
             s.editor.reset();
 
             if mode == CaptureMode::Screen {
-                
                 s.final_image = Some(result.pixbuf);
                 s.is_active = false;
                 window.set_visible(true);
                 placeholder_icon.set_visible(false);
                 drawing_area.queue_draw();
             } else {
-                
                 s.original_screenshot = Some(result.pixbuf);
                 s.is_active = true;
                 s.selection = None;
@@ -539,7 +496,6 @@ fn capture_screen_or_selection(
         }
     }
 }
-
 
 pub fn connect_all_handlers(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
     connect_undo_handler(state, components);

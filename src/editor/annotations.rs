@@ -1,6 +1,5 @@
 use gtk4::gdk::RGBA;
 
-
 #[derive(Clone, Debug)]
 pub struct Point {
     pub x: f64,
@@ -12,7 +11,6 @@ impl Point {
         Self { x, y }
     }
 }
-
 
 #[derive(Clone, Debug)]
 pub struct RectangleAnnotation {
@@ -38,7 +36,6 @@ impl RectangleAnnotation {
         }
     }
 
-    
     pub fn from_corners(x1: f64, y1: f64, x2: f64, y2: f64, color: RGBA, line_width: f64) -> Self {
         let x = x1.min(x2);
         let y = y1.min(y2);
@@ -47,18 +44,15 @@ impl RectangleAnnotation {
         Self::new(x, y, width, height, color, line_width)
     }
 
-    
     pub fn hit_test(&self, px: f64, py: f64) -> bool {
         let margin = self.line_width.max(5.0);
 
         if self.filled {
-            
             px >= self.x - margin
                 && px <= self.x + self.width + margin
                 && py >= self.y - margin
                 && py <= self.y + self.height + margin
         } else {
-            
             let near_left = (px - self.x).abs() <= margin
                 && py >= self.y - margin
                 && py <= self.y + self.height + margin;
@@ -76,19 +70,16 @@ impl RectangleAnnotation {
         }
     }
 
-    
     pub fn move_by(&mut self, dx: f64, dy: f64) {
         self.x += dx;
         self.y += dy;
     }
 
-    
     pub fn set_position(&mut self, x: f64, y: f64) {
         self.x = x;
         self.y = y;
     }
 }
-
 
 #[derive(Clone, Debug)]
 pub struct FreeDrawAnnotation {
@@ -110,7 +101,6 @@ impl FreeDrawAnnotation {
         self.points.push(Point::new(x, y));
     }
 
-    
     pub fn hit_test(&self, px: f64, py: f64) -> bool {
         let margin = self.line_width.max(8.0);
 
@@ -122,7 +112,6 @@ impl FreeDrawAnnotation {
             }
         }
 
-        
         for i in 0..self.points.len().saturating_sub(1) {
             let p1 = &self.points[i];
             let p2 = &self.points[i + 1];
@@ -134,7 +123,6 @@ impl FreeDrawAnnotation {
         false
     }
 
-    
     pub fn move_by(&mut self, dx: f64, dy: f64) {
         for point in &mut self.points {
             point.x += dx;
@@ -142,7 +130,6 @@ impl FreeDrawAnnotation {
         }
     }
 
-    
     pub fn bounding_box(&self) -> Option<(f64, f64, f64, f64)> {
         if self.points.is_empty() {
             return None;
@@ -163,7 +150,6 @@ impl FreeDrawAnnotation {
         Some((min_x, min_y, max_x - min_x, max_y - min_y))
     }
 }
-
 
 #[derive(Clone, Debug)]
 pub struct TextAnnotation {
@@ -187,14 +173,11 @@ impl TextAnnotation {
         }
     }
 
-    
     pub fn hit_test(&self, px: f64, py: f64) -> bool {
-        
         let approx_char_width = self.font_size * 0.6;
         let text_width = self.text.len() as f64 * approx_char_width;
         let text_height = self.font_size;
 
-        
         let margin = 5.0;
         px >= self.x - margin
             && px <= self.x + text_width + margin
@@ -202,19 +185,16 @@ impl TextAnnotation {
             && py <= self.y + margin
     }
 
-    
     pub fn move_by(&mut self, dx: f64, dy: f64) {
         self.x += dx;
         self.y += dy;
     }
 
-    
     pub fn set_position(&mut self, x: f64, y: f64) {
         self.x = x;
         self.y = y;
     }
 }
-
 
 fn point_to_segment_distance(px: f64, py: f64, x1: f64, y1: f64, x2: f64, y2: f64) -> f64 {
     let dx = x2 - x1;
@@ -222,13 +202,11 @@ fn point_to_segment_distance(px: f64, py: f64, x1: f64, y1: f64, x2: f64, y2: f6
     let length_sq = dx * dx + dy * dy;
 
     if length_sq == 0.0 {
-        
         let dpx = px - x1;
         let dpy = py - y1;
         return (dpx * dpx + dpy * dpy).sqrt();
     }
 
-    
     let t = ((px - x1) * dx + (py - y1) * dy) / length_sq;
     let t = t.clamp(0.0, 1.0);
 
@@ -240,7 +218,6 @@ fn point_to_segment_distance(px: f64, py: f64, x1: f64, y1: f64, x2: f64, y2: f6
     (dpx * dpx + dpy * dpy).sqrt()
 }
 
-
 #[derive(Clone, Debug)]
 pub enum Annotation {
     Rectangle(RectangleAnnotation),
@@ -249,7 +226,6 @@ pub enum Annotation {
 }
 
 impl Annotation {
-    
     pub fn hit_test(&self, px: f64, py: f64) -> bool {
         match self {
             Annotation::Rectangle(rect) => rect.hit_test(px, py),
@@ -258,7 +234,6 @@ impl Annotation {
         }
     }
 
-    
     pub fn move_by(&mut self, dx: f64, dy: f64) {
         match self {
             Annotation::Rectangle(rect) => rect.move_by(dx, dy),
@@ -267,7 +242,6 @@ impl Annotation {
         }
     }
 
-    
     pub fn position(&self) -> (f64, f64) {
         match self {
             Annotation::Rectangle(rect) => (rect.x, rect.y),
@@ -282,7 +256,6 @@ impl Annotation {
         }
     }
 
-    
     pub fn draw(&self, cr: &gtk4::cairo::Context, scale: f64, offset_x: f64, offset_y: f64) {
         match self {
             Annotation::Rectangle(rect) => {
@@ -351,7 +324,6 @@ impl Annotation {
         }
     }
 
-    
     pub fn draw_selected(
         &self,
         cr: &gtk4::cairo::Context,
@@ -359,10 +331,8 @@ impl Annotation {
         offset_x: f64,
         offset_y: f64,
     ) {
-        
         self.draw(cr, scale, offset_x, offset_y);
 
-        
         let (x, y, w, h) = match self {
             Annotation::Rectangle(rect) => (rect.x, rect.y, rect.width, rect.height),
             Annotation::FreeDraw(draw) => {
@@ -385,42 +355,38 @@ impl Annotation {
         let dw = (w + margin * 2.0) * scale;
         let dh = (h + margin * 2.0) * scale;
 
-        
         cr.set_source_rgba(0.2, 0.6, 1.0, 0.8);
         cr.set_line_width(2.0);
         cr.set_dash(&[6.0, 4.0], 0.0);
         cr.rectangle(dx, dy, dw, dh);
         let _ = cr.stroke();
 
-        
         cr.set_dash(&[], 0.0);
 
-        
         let handle_size = 8.0;
         cr.set_source_rgba(0.2, 0.6, 1.0, 1.0);
 
-        
         cr.rectangle(
             dx - handle_size / 2.0,
             dy - handle_size / 2.0,
             handle_size,
             handle_size,
         );
-        
+
         cr.rectangle(
             dx + dw - handle_size / 2.0,
             dy - handle_size / 2.0,
             handle_size,
             handle_size,
         );
-        
+
         cr.rectangle(
             dx - handle_size / 2.0,
             dy + dh - handle_size / 2.0,
             handle_size,
             handle_size,
         );
-        
+
         cr.rectangle(
             dx + dw - handle_size / 2.0,
             dy + dh - handle_size / 2.0,
@@ -431,12 +397,11 @@ impl Annotation {
     }
 }
 
-
 #[derive(Clone, Debug, Default)]
 pub struct AnnotationList {
     annotations: Vec<Annotation>,
     current_annotation: Option<Annotation>,
-    
+
     selected_index: Option<usize>,
 }
 
@@ -486,29 +451,23 @@ impl AnnotationList {
         self.current_annotation.as_ref()
     }
 
-    
     pub fn get_mut(&mut self, index: usize) -> Option<&mut Annotation> {
         self.annotations.get_mut(index)
     }
 
-    
     pub fn selected_index(&self) -> Option<usize> {
         self.selected_index
     }
 
-    
     pub fn set_selected(&mut self, index: Option<usize>) {
         self.selected_index = index;
     }
 
-    
     pub fn deselect(&mut self) {
         self.selected_index = None;
     }
 
-    
     pub fn hit_test(&self, px: f64, py: f64) -> Option<usize> {
-        
         for (i, annotation) in self.annotations.iter().enumerate().rev() {
             if annotation.hit_test(px, py) {
                 return Some(i);
@@ -517,7 +476,6 @@ impl AnnotationList {
         None
     }
 
-    
     pub fn move_selected(&mut self, dx: f64, dy: f64) -> bool {
         if let Some(index) = self.selected_index {
             if let Some(annotation) = self.annotations.get_mut(index) {
@@ -528,7 +486,6 @@ impl AnnotationList {
         false
     }
 
-    
     pub fn selected_position(&self) -> Option<(f64, f64)> {
         if let Some(index) = self.selected_index {
             self.annotations.get(index).map(|a| a.position())

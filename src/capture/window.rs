@@ -1,46 +1,37 @@
-
-
-
-
-
-
 #![allow(dead_code)]
 
 use gtk4::gdk_pixbuf::{Colorspace, Pixbuf};
 use gtk4::glib;
 use xcap::Window;
 
-
 #[derive(Debug, Clone)]
 pub struct WindowInfo {
-    
     pub id: u32,
-    
+
     pub pid: u32,
-    
+
     pub app_name: String,
-    
+
     pub title: String,
-    
+
     pub x: i32,
-    
+
     pub y: i32,
-    
+
     pub z: i32,
-    
+
     pub width: u32,
-    
+
     pub height: u32,
-    
+
     pub is_minimized: bool,
-    
+
     pub is_maximized: bool,
-    
+
     pub is_focused: bool,
 }
 
 impl WindowInfo {
-    
     fn from_xcap_window(window: &Window) -> Result<Self, String> {
         Ok(Self {
             id: window.id().map_err(|e| e.to_string())?,
@@ -58,7 +49,6 @@ impl WindowInfo {
         })
     }
 
-    
     pub fn display_label(&self) -> String {
         if self.title.is_empty() {
             format!("{} (ID: {})", self.app_name, self.id)
@@ -67,39 +57,33 @@ impl WindowInfo {
         }
     }
 
-    
     pub fn icon_name_hint(&self) -> &str {
         if self.app_name.is_empty() {
             "application-x-executable-symbolic"
         } else {
-            
             &self.app_name
         }
     }
 }
 
-
 pub struct WindowCaptureResult {
-    
     pub pixbuf: Pixbuf,
-    
+
     pub window_info: WindowInfo,
 }
 
-
 #[derive(Debug)]
 pub enum WindowCaptureError {
-    
     EnumerationFailed(String),
-    
+
     WindowNotFound,
-    
+
     CaptureFailed(String),
-    
+
     ConversionFailed(String),
-    
+
     WindowMinimized,
-    
+
     InfoFailed(String),
 }
 
@@ -126,10 +110,6 @@ pub fn list_capturable_windows() -> Result<Vec<WindowInfo>, WindowCaptureError> 
 
     for window in &windows {
         println!("Window: {}", window.title().unwrap_or_default());
-        
-        
-        
-        
 
         match WindowInfo::from_xcap_window(window) {
             Ok(info) => window_infos.push(info),
@@ -139,9 +119,6 @@ pub fn list_capturable_windows() -> Result<Vec<WindowInfo>, WindowCaptureError> 
 
     Ok(window_infos)
 }
-
-
-
 
 pub fn list_all_windows() -> Result<Vec<WindowInfo>, WindowCaptureError> {
     let windows =
@@ -159,19 +136,10 @@ pub fn list_all_windows() -> Result<Vec<WindowInfo>, WindowCaptureError> {
     Ok(window_infos)
 }
 
-
-
-
-
-
-
-
-
 pub fn capture_window_by_index(index: usize) -> Result<WindowCaptureResult, WindowCaptureError> {
     let windows =
         Window::all().map_err(|e| WindowCaptureError::EnumerationFailed(e.to_string()))?;
 
-    
     let capturable_windows: Vec<_> = windows
         .into_iter()
         .filter(|w| !w.is_minimized().unwrap_or(true))
@@ -183,14 +151,6 @@ pub fn capture_window_by_index(index: usize) -> Result<WindowCaptureResult, Wind
 
     capture_window_internal(window)
 }
-
-
-
-
-
-
-
-
 
 pub fn capture_window_by_id(window_id: u32) -> Result<WindowCaptureResult, WindowCaptureError> {
     let windows =
@@ -208,7 +168,6 @@ pub fn capture_window_by_id(window_id: u32) -> Result<WindowCaptureResult, Windo
     capture_window_internal(&window)
 }
 
-
 fn capture_window_internal(window: &Window) -> Result<WindowCaptureResult, WindowCaptureError> {
     let window_info =
         WindowInfo::from_xcap_window(window).map_err(|e| WindowCaptureError::InfoFailed(e))?;
@@ -225,11 +184,10 @@ fn capture_window_internal(window: &Window) -> Result<WindowCaptureResult, Windo
     })
 }
 
-
 fn rgba_image_to_pixbuf(image: image::RgbaImage) -> Result<Pixbuf, WindowCaptureError> {
     let width = image.width() as i32;
     let height = image.height() as i32;
-    let stride = width * 4; 
+    let stride = width * 4;
     let pixels = image.into_raw();
     let bytes = glib::Bytes::from(&pixels);
 

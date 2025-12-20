@@ -1,14 +1,7 @@
-
-
-
-
-
-
 #![allow(dead_code)]
 
 use gtk4 as gtk;
 use xcap::Monitor;
-
 
 #[derive(Debug, Clone)]
 pub struct MonitorInfo {
@@ -26,7 +19,6 @@ pub struct MonitorInfo {
 }
 
 impl MonitorInfo {
-    
     fn from_xcap(monitor: &Monitor) -> Result<Self, String> {
         Ok(Self {
             id: monitor.id().map_err(|e| e.to_string())?,
@@ -44,12 +36,10 @@ impl MonitorInfo {
     }
 }
 
-
 pub struct CaptureResult {
     pub pixbuf: gtk::gdk_pixbuf::Pixbuf,
     pub monitor_info: MonitorInfo,
 }
-
 
 pub fn get_all_monitors() -> Result<Vec<MonitorInfo>, String> {
     let monitors = Monitor::all().map_err(|e| format!("Failed to get monitors: {}", e))?;
@@ -69,7 +59,6 @@ pub fn get_all_monitors() -> Result<Vec<MonitorInfo>, String> {
     }
 }
 
-
 pub fn get_primary_monitor() -> Result<MonitorInfo, String> {
     let monitors = Monitor::all().map_err(|e| format!("Failed to get monitors: {}", e))?;
 
@@ -79,13 +68,11 @@ pub fn get_primary_monitor() -> Result<MonitorInfo, String> {
         }
     }
 
-    
     monitors
         .first()
         .ok_or_else(|| "No monitors found".to_string())
         .and_then(MonitorInfo::from_xcap)
 }
-
 
 pub fn get_monitor_at_point(x: i32, y: i32) -> Result<MonitorInfo, String> {
     let monitor =
@@ -94,11 +81,9 @@ pub fn get_monitor_at_point(x: i32, y: i32) -> Result<MonitorInfo, String> {
     MonitorInfo::from_xcap(&monitor)
 }
 
-
 pub fn capture_primary_monitor() -> Result<CaptureResult, String> {
     let monitors = Monitor::all().map_err(|e| format!("Failed to get monitors: {}", e))?;
 
-    
     let monitor = monitors
         .iter()
         .find(|m| m.is_primary().unwrap_or(false))
@@ -107,7 +92,6 @@ pub fn capture_primary_monitor() -> Result<CaptureResult, String> {
 
     capture_monitor_internal(monitor)
 }
-
 
 pub fn capture_monitor_by_id(monitor_id: u32) -> Result<CaptureResult, String> {
     let monitors = Monitor::all().map_err(|e| format!("Failed to get monitors: {}", e))?;
@@ -120,7 +104,6 @@ pub fn capture_monitor_by_id(monitor_id: u32) -> Result<CaptureResult, String> {
     capture_monitor_internal(monitor)
 }
 
-
 pub fn capture_monitor_by_name(name: &str) -> Result<CaptureResult, String> {
     let monitors = Monitor::all().map_err(|e| format!("Failed to get monitors: {}", e))?;
 
@@ -132,14 +115,12 @@ pub fn capture_monitor_by_name(name: &str) -> Result<CaptureResult, String> {
     capture_monitor_internal(monitor)
 }
 
-
 pub fn capture_monitor_at_point(x: i32, y: i32) -> Result<CaptureResult, String> {
     let monitor =
         Monitor::from_point(x, y).map_err(|e| format!("Failed to get monitor at point: {}", e))?;
 
     capture_monitor_internal(&monitor)
 }
-
 
 pub fn capture_all_monitors() -> Result<Vec<CaptureResult>, String> {
     let monitors = Monitor::all().map_err(|e| format!("Failed to get monitors: {}", e))?;
@@ -160,7 +141,6 @@ pub fn capture_all_monitors() -> Result<Vec<CaptureResult>, String> {
     }
 }
 
-
 fn capture_monitor_internal(monitor: &Monitor) -> Result<CaptureResult, String> {
     let monitor_info = MonitorInfo::from_xcap(monitor)?;
 
@@ -176,11 +156,10 @@ fn capture_monitor_internal(monitor: &Monitor) -> Result<CaptureResult, String> 
     })
 }
 
-
 fn image_to_pixbuf(image: image::RgbaImage) -> Result<gtk::gdk_pixbuf::Pixbuf, String> {
     let width = image.width() as i32;
     let height = image.height() as i32;
-    let stride = width * 4; 
+    let stride = width * 4;
     let pixels = image.into_raw();
 
     let bytes = gtk::glib::Bytes::from(&pixels);
@@ -188,8 +167,8 @@ fn image_to_pixbuf(image: image::RgbaImage) -> Result<gtk::gdk_pixbuf::Pixbuf, S
     let pixbuf = gtk::gdk_pixbuf::Pixbuf::from_bytes(
         &bytes,
         gtk::gdk_pixbuf::Colorspace::Rgb,
-        true, 
-        8,    
+        true,
+        8,
         width,
         height,
         stride,
@@ -204,7 +183,6 @@ mod tests {
 
     #[test]
     fn test_get_all_monitors() {
-        
         if let Ok(monitors) = get_all_monitors() {
             assert!(!monitors.is_empty());
             for monitor in &monitors {
@@ -218,7 +196,6 @@ mod tests {
 
     #[test]
     fn test_get_primary_monitor() {
-        
         if let Ok(monitor) = get_primary_monitor() {
             println!("Primary monitor: {}", monitor.name);
             assert!(monitor.width > 0);

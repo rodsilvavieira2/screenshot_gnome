@@ -1,18 +1,15 @@
 use gtk4::gdk::RGBA;
 use gtk4::gdk_pixbuf::Pixbuf;
 
-
 #[derive(Clone, Debug)]
 pub struct PickedColor {
-    
     pub color: RGBA,
-    
+
     pub x: i32,
     pub y: i32,
 }
 
 impl PickedColor {
-    
     pub fn to_hex(&self) -> String {
         format!(
             "#{:02X}{:02X}{:02X}",
@@ -22,7 +19,6 @@ impl PickedColor {
         )
     }
 
-    
     pub fn to_rgb(&self) -> (u8, u8, u8) {
         (
             (self.color.red() * 255.0) as u8,
@@ -31,7 +27,6 @@ impl PickedColor {
         )
     }
 
-    
     pub fn to_rgba(&self) -> (u8, u8, u8, u8) {
         (
             (self.color.red() * 255.0) as u8,
@@ -41,7 +36,6 @@ impl PickedColor {
         )
     }
 }
-
 
 #[derive(Debug)]
 pub enum ColorPickError {
@@ -60,7 +54,6 @@ impl std::fmt::Display for ColorPickError {
 
 impl std::error::Error for ColorPickError {}
 
-
 pub fn pick_color_from_pixbuf(
     pixbuf: &Pixbuf,
     x: i32,
@@ -69,7 +62,6 @@ pub fn pick_color_from_pixbuf(
     let width = pixbuf.width();
     let height = pixbuf.height();
 
-    
     if x < 0 || x >= width || y < 0 || y >= height {
         return Err(ColorPickError::OutOfBounds);
     }
@@ -78,10 +70,8 @@ pub fn pick_color_from_pixbuf(
     let rowstride = pixbuf.rowstride() as usize;
     let has_alpha = pixbuf.has_alpha();
 
-    
     let pixels = unsafe { pixbuf.pixels() };
 
-    
     let offset = (y as usize) * rowstride + (x as usize) * n_channels;
 
     if offset + n_channels > pixels.len() {
@@ -104,7 +94,6 @@ pub fn pick_color_from_pixbuf(
     })
 }
 
-
 pub fn pick_color_at_display_coords(
     pixbuf: &Pixbuf,
     display_x: f64,
@@ -113,13 +102,11 @@ pub fn pick_color_at_display_coords(
     offset_x: f64,
     offset_y: f64,
 ) -> Result<PickedColor, ColorPickError> {
-    
     let img_x = ((display_x - offset_x) / scale) as i32;
     let img_y = ((display_y - offset_y) / scale) as i32;
 
     pick_color_from_pixbuf(pixbuf, img_x, img_y)
 }
-
 
 pub fn pick_average_color(
     pixbuf: &Pixbuf,
@@ -130,7 +117,6 @@ pub fn pick_average_color(
     let width = pixbuf.width();
     let height = pixbuf.height();
 
-    
     if center_x < 0 || center_x >= width || center_y < 0 || center_y >= height {
         return Err(ColorPickError::OutOfBounds);
     }
@@ -185,12 +171,10 @@ pub fn pick_average_color(
     })
 }
 
-
 #[derive(Clone, Debug, Default)]
 pub struct ColorPickerState {
-    
     pub picked_color: Option<PickedColor>,
-    
+
     pub is_active: bool,
 }
 

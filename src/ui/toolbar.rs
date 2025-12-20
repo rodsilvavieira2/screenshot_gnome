@@ -1,7 +1,3 @@
-
-
-
-
 #![allow(dead_code)]
 
 use gtk4 as gtk;
@@ -13,7 +9,6 @@ use std::rc::Rc;
 
 use crate::app::AppState;
 use crate::editor::EditorTool;
-
 
 pub struct ToolbarComponents {
     pub tools_box: gtk::Box,
@@ -29,29 +24,23 @@ pub struct ToolbarComponents {
     pub save_btn: gtk::Button,
 }
 
-
 pub struct CropToolbarComponents {
     pub crop_tools_box: gtk::Box,
     pub confirm_btn: gtk::Button,
     pub cancel_btn: gtk::Button,
 }
 
-
 pub fn create_toolbar(state: &Rc<RefCell<AppState>>) -> ToolbarComponents {
-    
     let color_button = gtk::ColorDialogButton::builder()
         .dialog(&gtk::ColorDialog::new())
         .rgba(&gtk::gdk::RGBA::new(1.0, 0.0, 0.0, 1.0))
         .tooltip_text("Select Color")
         .build();
 
-    
     let color_picker_circle = create_color_picker_circle(state);
 
-    
     connect_color_button(state, &color_button, &color_picker_circle);
 
-    
     let tool_pointer_btn = gtk::ToggleButton::builder()
         .icon_name("input-mouse-symbolic")
         .tooltip_text("Pointer")
@@ -87,7 +76,6 @@ pub fn create_toolbar(state: &Rc<RefCell<AppState>>) -> ToolbarComponents {
         .build();
     tool_text_btn.add_css_class("flat");
 
-    
     let tool_buttons_box = gtk::Box::builder()
         .orientation(Orientation::Horizontal)
         .spacing(6)
@@ -102,28 +90,24 @@ pub fn create_toolbar(state: &Rc<RefCell<AppState>>) -> ToolbarComponents {
     tool_buttons_box.append(&tool_text_btn);
     tool_buttons_box.append(&color_button);
 
-    
     let undo_btn = gtk::Button::builder()
         .icon_name("edit-undo-symbolic")
         .tooltip_text("Undo")
         .build();
     undo_btn.add_css_class("flat");
 
-    
     let copy_btn = gtk::Button::builder()
         .icon_name("edit-copy-symbolic")
         .tooltip_text("Copy to Clipboard")
         .build();
     copy_btn.add_css_class("flat");
 
-    
     let save_btn = gtk::Button::builder()
         .icon_name("document-save-symbolic")
         .tooltip_text("Save")
         .build();
     save_btn.add_css_class("suggested-action");
 
-    
     let tools_box = gtk::Box::builder()
         .orientation(Orientation::Horizontal)
         .spacing(6)
@@ -153,7 +137,6 @@ pub fn create_toolbar(state: &Rc<RefCell<AppState>>) -> ToolbarComponents {
         save_btn,
     }
 }
-
 
 pub fn create_crop_toolbar() -> CropToolbarComponents {
     let crop_tools_box = gtk::Box::builder()
@@ -189,7 +172,6 @@ pub fn create_crop_toolbar() -> CropToolbarComponents {
     }
 }
 
-
 fn create_color_picker_circle(state: &Rc<RefCell<AppState>>) -> gtk::DrawingArea {
     let color_picker_circle = gtk::DrawingArea::builder()
         .width_request(20)
@@ -202,7 +184,6 @@ fn create_color_picker_circle(state: &Rc<RefCell<AppState>>) -> gtk::DrawingArea
             let state = state.borrow();
             let color = state.editor.current_color();
 
-            
             cr.arc(
                 width as f64 / 2.0,
                 height as f64 / 2.0,
@@ -226,7 +207,6 @@ fn create_color_picker_circle(state: &Rc<RefCell<AppState>>) -> gtk::DrawingArea
     color_picker_circle
 }
 
-
 fn connect_color_button(
     state: &Rc<RefCell<AppState>>,
     color_button: &gtk::ColorDialogButton,
@@ -243,14 +223,12 @@ fn connect_color_button(
     });
 }
 
-
 pub fn connect_tool_buttons(
     state: &Rc<RefCell<AppState>>,
     components: &ToolbarComponents,
     tools_box: &gtk::Box,
     crop_tools_box: &gtk::Box,
 ) {
-    
     components.tool_pointer_btn.connect_toggled({
         let state = state.clone();
         move |btn| {
@@ -262,7 +240,6 @@ pub fn connect_tool_buttons(
         }
     });
 
-    
     components.tool_pencil_btn.connect_toggled({
         let state = state.clone();
         move |btn| {
@@ -274,7 +251,6 @@ pub fn connect_tool_buttons(
         }
     });
 
-    
     components.tool_rectangle_btn.connect_toggled({
         let state = state.clone();
         move |btn| {
@@ -286,7 +262,6 @@ pub fn connect_tool_buttons(
         }
     });
 
-    
     components.tool_crop_btn.connect_toggled({
         let state = state.clone();
         let tools_box = tools_box.clone();
@@ -303,7 +278,6 @@ pub fn connect_tool_buttons(
         }
     });
 
-    
     components.tool_text_btn.connect_toggled({
         let state = state.clone();
         move |btn| {
