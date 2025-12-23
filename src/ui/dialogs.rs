@@ -112,6 +112,7 @@ pub fn show_window_selector(
     parent_window: &impl IsA<gtk::Window>,
     drawing_area: &gtk::DrawingArea,
     placeholder_icon: &gtk::Image,
+    tools_box: &gtk::Box,
 ) {
     let window_selector = gtk::Window::builder()
         .title("Select Window")
@@ -179,6 +180,7 @@ pub fn show_window_selector(
         let placeholder_icon = placeholder_icon.clone();
         let window_selector = window_selector.clone();
         let window_ids = window_ids.clone();
+        let tools_box = tools_box.clone();
         move |_lb, row| {
             let idx = row.index();
             if idx >= 0 {
@@ -192,6 +194,7 @@ pub fn show_window_selector(
 
                         placeholder_icon.set_visible(false);
                         drawing_area.queue_draw();
+                        tools_box.set_visible(true);
                     }
                 }
             }

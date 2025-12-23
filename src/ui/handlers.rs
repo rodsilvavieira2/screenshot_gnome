@@ -428,7 +428,7 @@ pub fn connect_crop_handlers(state: &Rc<RefCell<AppState>>, components: &UiCompo
 
                 window.unfullscreen();
                 header_bar.set_visible(true);
-                tools_box.set_visible(true);
+                tools_box.set_visible(s.final_image.is_some());
                 crop_tools_box.set_visible(false);
 
                 if s.final_image.is_none() {
@@ -465,10 +465,17 @@ pub fn connect_screenshot_handler(state: &Rc<RefCell<AppState>>, components: &Ui
         let crop_tools_box = components.crop_toolbar.crop_tools_box.clone();
 
         move |_| {
+            tools_box.set_visible(false);
             let mode = state.borrow().mode;
 
             if mode == CaptureMode::Window {
-                show_window_selector(&state, &window, &drawing_area, &placeholder_icon);
+                show_window_selector(
+                    &state,
+                    &window,
+                    &drawing_area,
+                    &placeholder_icon,
+                    &tools_box,
+                );
             } else {
                 capture_screen_or_selection(
                     &state,
@@ -516,6 +523,7 @@ fn capture_screen_or_selection(
                 window.set_visible(true);
                 placeholder_icon.set_visible(false);
                 drawing_area.queue_draw();
+                tools_box.set_visible(true);
             } else {
                 s.original_screenshot = Some(result.pixbuf);
                 s.is_active = true;

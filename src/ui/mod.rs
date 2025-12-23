@@ -48,6 +48,8 @@ pub fn build_ui(app: &adw::Application) {
         &crop_toolbar.crop_tools_box,
     );
 
+    toolbar.tools_box.set_visible(false);
+
     let overlay = gtk::Overlay::builder().child(&drawing.drawing_area).build();
     overlay.add_overlay(&drawing.placeholder_icon);
     overlay.add_overlay(&toolbar.tools_box);
