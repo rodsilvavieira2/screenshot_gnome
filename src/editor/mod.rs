@@ -27,6 +27,8 @@ pub struct EditorState {
 
     pub is_editing: bool,
 
+    pub last_drag_moved: bool,
+
     pub display_scale: f64,
     pub display_offset_x: f64,
     pub display_offset_y: f64,
@@ -47,6 +49,7 @@ impl Default for EditorState {
             color_picker: ColorPickerState::new(),
             pending_text: None,
             is_editing: false,
+            last_drag_moved: false,
             display_scale: 1.0,
             display_offset_x: 0.0,
             display_offset_y: 0.0,
@@ -95,6 +98,7 @@ impl EditorState {
     }
 
     pub fn on_drag_start(&mut self, x: f64, y: f64) {
+        self.last_drag_moved = false;
         let (img_x, img_y) = self.display_to_image_coords(x, y);
         self.tool_state.start_drag(img_x, img_y);
 
@@ -200,6 +204,9 @@ impl EditorState {
                     self.tool_state.font_size,
                 );
                 self.annotations.add(Annotation::Text(text_annotation));
+                // Select the newly added text
+                let new_index = self.annotations.len() - 1;
+                self.annotations.set_selected(Some(new_index));
             }
         }
     }
@@ -233,6 +240,7 @@ impl EditorState {
     }
 
     pub fn pointer_drag_start(&mut self, display_x: f64, display_y: f64) -> bool {
+        self.last_drag_moved = false;
         let (img_x, img_y) = self.display_to_image_coords(display_x, display_y);
 
         if let Some(index) = self.annotations.hit_test(img_x, img_y) {
@@ -271,11 +279,16 @@ impl EditorState {
     }
 
     pub fn pointer_drag_end(&mut self) {
+        self.last_drag_moved = self.tool_state.moved_annotation;
         self.tool_state.end_annotation_drag();
     }
 
     pub fn is_pointer_dragging(&self) -> bool {
         self.tool_state.is_dragging_annotation
+    }
+
+    pub fn did_move_annotation(&self) -> bool {
+        self.tool_state.moved_annotation
     }
 
     pub fn deselect_annotation(&mut self) {

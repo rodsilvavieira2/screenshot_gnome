@@ -65,6 +65,8 @@ pub struct ToolState {
     pub pointer_drag_offset: Option<(f64, f64)>,
 
     pub is_dragging_annotation: bool,
+
+    pub moved_annotation: bool,
 }
 
 impl Default for ToolState {
@@ -79,6 +81,7 @@ impl Default for ToolState {
             drag_current: None,
             pointer_drag_offset: None,
             is_dragging_annotation: false,
+            moved_annotation: false,
         }
     }
 }
@@ -133,6 +136,7 @@ impl ToolState {
         self.drag_current = None;
         self.pointer_drag_offset = None;
         self.is_dragging_annotation = false;
+        self.moved_annotation = false;
     }
 
     pub fn start_annotation_drag(
@@ -147,10 +151,16 @@ impl ToolState {
         self.drag_current = Some((click_x, click_y));
 
         self.pointer_drag_offset = Some((click_x - annotation_x, click_y - annotation_y));
+        self.moved_annotation = false;
     }
 
     pub fn update_annotation_drag(&mut self, x: f64, y: f64) {
         if self.is_dragging_annotation {
+            if let Some((last_x, last_y)) = self.drag_current {
+                if (x - last_x).abs() > 0.1 || (y - last_y).abs() > 0.1 {
+                    self.moved_annotation = true;
+                }
+            }
             self.drag_current = Some((x, y));
         }
     }

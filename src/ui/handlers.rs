@@ -145,7 +145,7 @@ fn handle_drag_begin(
     if s.final_image.is_some() {
         let tool = s.editor.current_tool();
         match tool {
-            EditorTool::Pointer => {
+            EditorTool::Pointer | EditorTool::Text => {
                 s.editor.pointer_drag_start(x, y);
             }
             EditorTool::Pencil => {
@@ -204,7 +204,7 @@ fn handle_drag_update(
             let (img_x, img_y) = s.editor.display_to_image_coords(current_x, current_y);
 
             match tool {
-                EditorTool::Pointer => {
+                EditorTool::Pointer | EditorTool::Text => {
                     s.editor.pointer_drag_update(current_x, current_y);
                 }
                 EditorTool::Pencil => {
@@ -278,7 +278,7 @@ fn handle_drag_end(
             let (img_x, img_y) = s.editor.display_to_image_coords(current_x, current_y);
 
             match tool {
-                EditorTool::Pointer => {
+                EditorTool::Pointer | EditorTool::Text => {
                     s.editor.pointer_drag_end();
                 }
                 EditorTool::Pencil => {
@@ -344,7 +344,20 @@ pub fn connect_click_handlers(state: &Rc<RefCell<AppState>>, components: &UiComp
                     }
                 }
                 EditorTool::Text => {
+                    if s.editor.last_drag_moved {
+                        return;
+                    }
+
                     let (img_x, img_y) = s.editor.display_to_image_coords(x, y);
+
+                    // If we clicked on an existing annotation, just select it and don't open popover
+                    if let Some(index) = s.editor.annotations.hit_test(img_x, img_y) {
+                        s.editor.annotations.set_selected(Some(index));
+                        drop(s);
+                        drawing_area.queue_draw();
+                        return;
+                    }
+
                     s.editor.pending_text = Some(crate::editor::PendingText {
                         x: img_x,
                         y: img_y,
