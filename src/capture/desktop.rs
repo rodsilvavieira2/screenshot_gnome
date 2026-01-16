@@ -18,7 +18,6 @@ impl std::fmt::Display for DisplayServer {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DesktopEnvironment {
     Gnome,
@@ -64,26 +63,32 @@ impl DesktopSession {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_wayland(&self) -> bool {
         self.display_server == DisplayServer::Wayland
     }
 
+    #[allow(dead_code)]
     pub fn is_x11(&self) -> bool {
         self.display_server == DisplayServer::X11
     }
 
+    #[allow(dead_code)]
     pub fn is_gnome(&self) -> bool {
         self.desktop_environment == DesktopEnvironment::Gnome
     }
 
+    #[allow(dead_code)]
     pub fn is_kde(&self) -> bool {
         self.desktop_environment == DesktopEnvironment::Kde
     }
 
+    #[allow(dead_code)]
     pub fn is_hyprland(&self) -> bool {
         self.desktop_environment == DesktopEnvironment::Hyprland
     }
 
+    #[allow(dead_code)]
     pub fn is_sway(&self) -> bool {
         self.desktop_environment == DesktopEnvironment::Sway
     }
@@ -266,7 +271,6 @@ mod tests {
 
     #[test]
     fn test_desktop_session_detect() {
-
         let session = DesktopSession::detect();
         println!("Detected session: {}", session);
         println!("Backend: {}", session.window_list_backend());

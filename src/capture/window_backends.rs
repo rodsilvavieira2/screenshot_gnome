@@ -1,33 +1,17 @@
-
-
-
-
-
-
-
-
-
-
-
-
 use super::desktop::{DesktopSession, WindowListBackend};
 use super::window::{WindowCaptureError, WindowCaptureResult, WindowInfo};
 use gtk4::gdk_pixbuf::{Colorspace, Pixbuf};
 use gtk4::glib;
 use std::process::Command;
 
-
 pub type WindowListResult = Result<Vec<WindowInfo>, WindowCaptureError>;
 
-
 pub type WindowCaptureBackendResult = Result<WindowCaptureResult, WindowCaptureError>;
-
 
 pub fn list_windows_for_session(session: &DesktopSession) -> WindowListResult {
     let backend = session.window_list_backend();
     list_windows_with_backend(backend)
 }
-
 
 pub fn list_windows_with_backend(backend: WindowListBackend) -> WindowListResult {
     match backend {
@@ -39,7 +23,6 @@ pub fn list_windows_with_backend(backend: WindowListBackend) -> WindowListResult
     }
 }
 
-
 pub fn capture_window_for_session(
     session: &DesktopSession,
     window_info: &WindowInfo,
@@ -47,7 +30,6 @@ pub fn capture_window_for_session(
     let backend = session.window_list_backend();
     capture_window_with_backend(backend, window_info)
 }
-
 
 pub fn capture_window_with_backend(
     backend: WindowListBackend,
@@ -61,11 +43,6 @@ pub fn capture_window_with_backend(
         WindowListBackend::X11 | WindowListBackend::Xcap => capture_window_xcap(window_info),
     }
 }
-
-
-
-
-
 
 fn list_windows_hyprland() -> WindowListResult {
     let output = Command::new("hyprctl")
@@ -85,12 +62,8 @@ fn list_windows_hyprland() -> WindowListResult {
     parse_hyprland_json(&json_str)
 }
 
-
 fn parse_hyprland_json(json_str: &str) -> WindowListResult {
-
-
     let mut windows = Vec::new();
-
 
     let trimmed = json_str.trim();
     if !trimmed.starts_with('[') || !trimmed.ends_with(']') {
@@ -98,7 +71,6 @@ fn parse_hyprland_json(json_str: &str) -> WindowListResult {
             "Invalid JSON from hyprctl".to_string(),
         ));
     }
-
 
     let content = &trimmed[1..trimmed.len() - 1];
     let mut depth = 0;
@@ -137,7 +109,6 @@ fn parse_hyprland_json(json_str: &str) -> WindowListResult {
     Ok(windows)
 }
 
-
 fn parse_hyprland_client_object(obj_str: &str) -> Option<WindowInfo> {
     let address = extract_json_hex_value(obj_str, "address")?;
     let id = u32::from_str_radix(&address.trim_start_matches("0x"), 16).unwrap_or(0);
@@ -146,16 +117,13 @@ fn parse_hyprland_client_object(obj_str: &str) -> Option<WindowInfo> {
     let title = extract_json_string(obj_str, "title").unwrap_or_default();
     let class = extract_json_string(obj_str, "class").unwrap_or_default();
 
-
     let (x, y) = extract_json_position(obj_str, "at").unwrap_or((0, 0));
-
 
     let (width, height) = extract_json_size(obj_str, "size").unwrap_or((0, 0));
 
     let is_focused = extract_json_bool(obj_str, "focusHistoryID")
         .map(|v| v == 0)
         .unwrap_or(false);
-
 
     let is_minimized = extract_json_bool_field(obj_str, "hidden").unwrap_or(false);
     let is_maximized = extract_json_bool_field(obj_str, "fullscreen").unwrap_or(false);
@@ -176,15 +144,11 @@ fn parse_hyprland_client_object(obj_str: &str) -> Option<WindowInfo> {
     })
 }
 
-
 fn capture_window_hyprland(window_info: &WindowInfo) -> WindowCaptureBackendResult {
-
-
     let geometry = format!(
         "{},{} {}x{}",
         window_info.x, window_info.y, window_info.width, window_info.height
     );
-
 
     let temp_path = format!("/tmp/screenshot_gnome_{}.png", std::process::id());
 
@@ -201,9 +165,7 @@ fn capture_window_hyprland(window_info: &WindowInfo) -> WindowCaptureBackendResu
         )));
     }
 
-
     let pixbuf = load_pixbuf_from_file(&temp_path)?;
-
 
     let _ = std::fs::remove_file(&temp_path);
 
@@ -212,7 +174,6 @@ fn capture_window_hyprland(window_info: &WindowInfo) -> WindowCaptureBackendResu
         window_info: window_info.clone(),
     })
 }
-
 
 fn extract_json_string(json: &str, key: &str) -> Option<String> {
     let pattern = format!("\"{}\":", key);
@@ -248,11 +209,9 @@ fn extract_json_string(json: &str, key: &str) -> Option<String> {
     None
 }
 
-
 fn extract_json_hex_value(json: &str, key: &str) -> Option<String> {
     extract_json_string(json, key)
 }
-
 
 fn extract_json_number(json: &str, key: &str) -> Option<u32> {
     let pattern = format!("\"{}\":", key);
@@ -265,7 +224,6 @@ fn extract_json_number(json: &str, key: &str) -> Option<u32> {
     rest[..end].parse().ok()
 }
 
-
 fn extract_json_bool(json: &str, key: &str) -> Option<i32> {
     let pattern = format!("\"{}\":", key);
     let start = json.find(&pattern)? + pattern.len();
@@ -276,7 +234,6 @@ fn extract_json_bool(json: &str, key: &str) -> Option<i32> {
         .unwrap_or(rest.len());
     rest[..end].parse().ok()
 }
-
 
 fn extract_json_bool_field(json: &str, key: &str) -> Option<bool> {
     let pattern = format!("\"{}\":", key);
@@ -291,7 +248,6 @@ fn extract_json_bool_field(json: &str, key: &str) -> Option<bool> {
         None
     }
 }
-
 
 fn extract_json_position(json: &str, key: &str) -> Option<(i32, i32)> {
     let pattern = format!("\"{}\":", key);
@@ -315,7 +271,6 @@ fn extract_json_position(json: &str, key: &str) -> Option<(i32, i32)> {
     }
 }
 
-
 fn extract_json_size(json: &str, key: &str) -> Option<(u32, u32)> {
     let pattern = format!("\"{}\":", key);
     let start = json.find(&pattern)? + pattern.len();
@@ -338,11 +293,6 @@ fn extract_json_size(json: &str, key: &str) -> Option<(u32, u32)> {
     }
 }
 
-
-
-
-
-
 fn list_windows_sway() -> WindowListResult {
     let output = Command::new("swaymsg")
         .args(["-t", "get_tree"])
@@ -361,32 +311,24 @@ fn list_windows_sway() -> WindowListResult {
     parse_sway_tree(&json_str)
 }
 
-
 fn parse_sway_tree(json_str: &str) -> WindowListResult {
     let mut windows = Vec::new();
     extract_sway_windows(json_str, &mut windows);
     Ok(windows)
 }
 
-
 fn extract_sway_windows(json_str: &str, windows: &mut Vec<WindowInfo>) {
-
-
-
     let mut search_pos = 0;
 
     while let Some(start) = json_str[search_pos..].find("\"pid\":") {
         let abs_pos = search_pos + start;
 
-
         if let Some(obj_start) = find_object_start(json_str, abs_pos) {
             if let Some(obj_end) = find_object_end(json_str, obj_start) {
                 let obj_str = &json_str[obj_start..=obj_end];
 
-
                 if obj_str.contains("\"app_id\"") || obj_str.contains("\"window_properties\"") {
                     if let Some(info) = parse_sway_node(obj_str) {
-
                         if !windows.iter().any(|w| w.id == info.id) {
                             windows.push(info);
                         }
@@ -401,7 +343,6 @@ fn extract_sway_windows(json_str: &str, windows: &mut Vec<WindowInfo>) {
         search_pos = abs_pos + 6;
     }
 }
-
 
 fn find_object_start(json: &str, pos: usize) -> Option<usize> {
     let bytes = json.as_bytes();
@@ -422,7 +363,6 @@ fn find_object_start(json: &str, pos: usize) -> Option<usize> {
 
     None
 }
-
 
 fn find_object_end(json: &str, start: usize) -> Option<usize> {
     let bytes = json.as_bytes();
@@ -453,20 +393,14 @@ fn find_object_end(json: &str, start: usize) -> Option<usize> {
     None
 }
 
-
 fn parse_sway_node(obj_str: &str) -> Option<WindowInfo> {
     let id = extract_json_number(obj_str, "id")?;
     let pid = extract_json_number(obj_str, "pid").unwrap_or(0);
 
-
     let title = extract_json_string(obj_str, "name").unwrap_or_default();
 
-
-    let app_name = extract_json_string(obj_str, "app_id").unwrap_or_else(|| {
-
-        extract_json_string(obj_str, "class").unwrap_or_default()
-    });
-
+    let app_name = extract_json_string(obj_str, "app_id")
+        .unwrap_or_else(|| extract_json_string(obj_str, "class").unwrap_or_default());
 
     let (x, y, width, height) = parse_sway_rect(obj_str).unwrap_or((0, 0, 0, 0));
 
@@ -491,7 +425,6 @@ fn parse_sway_node(obj_str: &str) -> Option<WindowInfo> {
     })
 }
 
-
 fn parse_sway_rect(obj_str: &str) -> Option<(i32, i32, u32, u32)> {
     let rect_start = obj_str.find("\"rect\":")?;
     let rest = &obj_str[rect_start..];
@@ -507,9 +440,7 @@ fn parse_sway_rect(obj_str: &str) -> Option<(i32, i32, u32, u32)> {
     Some((x, y, width, height))
 }
 
-
 fn capture_window_sway(window_info: &WindowInfo) -> WindowCaptureBackendResult {
-
     let geometry = format!(
         "{},{} {}x{}",
         window_info.x, window_info.y, window_info.width, window_info.height
@@ -539,13 +470,7 @@ fn capture_window_sway(window_info: &WindowInfo) -> WindowCaptureBackendResult {
     })
 }
 
-
-
-
-
-
 fn list_windows_gnome_wayland() -> WindowListResult {
-
     let output = Command::new("gdbus")
         .args([
             "call",
@@ -565,21 +490,14 @@ fn list_windows_gnome_wayland() -> WindowListResult {
             parse_gnome_introspect_output(&result_str)
         }
         _ => {
-
             eprintln!("GNOME Shell Introspect not available, falling back to xcap");
             list_windows_xcap()
         }
     }
 }
 
-
 fn parse_gnome_introspect_output(output: &str) -> WindowListResult {
-
-
     let mut windows = Vec::new();
-
-
-
 
     let mut search_pos = 0;
     let mut window_id: u32 = 1;
@@ -587,10 +505,8 @@ fn parse_gnome_introspect_output(output: &str) -> WindowListResult {
     while let Some(start) = output[search_pos..].find("'wm-class':") {
         let abs_pos = search_pos + start;
 
-
         let wm_class =
             extract_gvariant_string(&output[abs_pos..], "'wm-class':").unwrap_or_default();
-
 
         let title = if let Some(title_pos) = output[search_pos..].find("'title':") {
             extract_gvariant_string(&output[search_pos + title_pos..], "'title':")
@@ -599,13 +515,11 @@ fn parse_gnome_introspect_output(output: &str) -> WindowListResult {
             String::new()
         };
 
-
         let pid = if let Some(pid_pos) = output[search_pos..].find("'pid':") {
             extract_gvariant_number(&output[search_pos + pid_pos..]).unwrap_or(0)
         } else {
             0
         };
-
 
         let (width, height) = extract_gnome_dimensions(&output[search_pos..]).unwrap_or((0, 0));
 
@@ -629,18 +543,15 @@ fn parse_gnome_introspect_output(output: &str) -> WindowListResult {
     }
 
     if windows.is_empty() {
-
         list_windows_xcap()
     } else {
         Ok(windows)
     }
 }
 
-
 fn extract_gvariant_string(text: &str, prefix: &str) -> Option<String> {
     let start = text.find(prefix)? + prefix.len();
     let rest = text[start..].trim_start();
-
 
     let quote_char = if rest.starts_with('<') {
         rest.find('\'')?;
@@ -658,11 +569,9 @@ fn extract_gvariant_string(text: &str, prefix: &str) -> Option<String> {
     Some(content[..end].to_string())
 }
 
-
 fn extract_gvariant_number(text: &str) -> Option<u32> {
     let start = text.find("'pid':")? + 6;
     let rest = text[start..].trim_start();
-
 
     let number_part = if rest.starts_with('<') {
         &rest[1..]
@@ -670,14 +579,12 @@ fn extract_gvariant_number(text: &str) -> Option<u32> {
         rest
     };
 
-
     let number_str = number_part
         .split_whitespace()
         .find(|s| s.chars().all(|c| c.is_ascii_digit()))?;
 
     number_str.parse().ok()
 }
-
 
 fn extract_gnome_dimensions(text: &str) -> Option<(u32, u32)> {
     let width = if let Some(pos) = text.find("'width':") {
@@ -699,7 +606,6 @@ fn extract_gnome_dimensions(text: &str) -> Option<(u32, u32)> {
     }
 }
 
-
 fn extract_gvariant_dimension(text: &str) -> Option<u32> {
     let colon_pos = text.find(':')?;
     let rest = text[colon_pos + 1..].trim_start();
@@ -715,14 +621,8 @@ fn extract_gvariant_dimension(text: &str) -> Option<u32> {
     }
 }
 
-
 fn capture_window_gnome_wayland(window_info: &WindowInfo) -> WindowCaptureBackendResult {
     let temp_path = format!("/tmp/screenshot_gnome_{}.png", std::process::id());
-
-
-
-
-
 
     let portal_result = Command::new("gdbus")
         .args([
@@ -752,13 +652,10 @@ fn capture_window_gnome_wayland(window_info: &WindowInfo) -> WindowCaptureBacken
         }
     }
 
-
-
     let geometry = format!(
         "{},{} {}x{}",
         window_info.x, window_info.y, window_info.width, window_info.height
     );
-
 
     let grim_result = Command::new("grim")
         .args(["-g", &geometry, &temp_path])
@@ -776,7 +673,6 @@ fn capture_window_gnome_wayland(window_info: &WindowInfo) -> WindowCaptureBacken
         }
     }
 
-
     let gnome_result = Command::new("gnome-screenshot")
         .args(["-f", &temp_path])
         .output();
@@ -785,7 +681,6 @@ fn capture_window_gnome_wayland(window_info: &WindowInfo) -> WindowCaptureBacken
         if output.status.success() {
             if let Ok(full_pixbuf) = load_pixbuf_from_file(&temp_path) {
                 let _ = std::fs::remove_file(&temp_path);
-
 
                 if let Some(cropped) = crop_pixbuf(
                     &full_pixbuf,
@@ -803,17 +698,10 @@ fn capture_window_gnome_wayland(window_info: &WindowInfo) -> WindowCaptureBacken
         }
     }
 
-
     capture_window_xcap(window_info)
 }
 
-
-
-
-
-
 fn list_windows_kde_wayland() -> WindowListResult {
-
     let output = Command::new("gdbus")
         .args([
             "call",
@@ -827,7 +715,6 @@ fn list_windows_kde_wayland() -> WindowListResult {
         ])
         .output();
 
-
     let kdotool_output = Command::new("kdotool")
         .args(["search", "--name", ""])
         .output();
@@ -839,7 +726,6 @@ fn list_windows_kde_wayland() -> WindowListResult {
         }
     }
 
-
     if let Ok(output) = output {
         if output.status.success() {
             let result_str = String::from_utf8_lossy(&output.stdout);
@@ -847,18 +733,15 @@ fn list_windows_kde_wayland() -> WindowListResult {
         }
     }
 
-
     eprintln!("KDE window listing not available, falling back to xcap");
     list_windows_xcap()
 }
-
 
 fn parse_kdotool_output(output: &str) -> WindowListResult {
     let mut windows = Vec::new();
 
     for line in output.lines() {
         if let Ok(id) = line.trim().parse::<u32>() {
-
             let title = Command::new("kdotool")
                 .args(["getwindowname", &id.to_string()])
                 .output()
@@ -896,41 +779,19 @@ fn parse_kdotool_output(output: &str) -> WindowListResult {
     }
 }
 
-
 fn parse_kde_dbus_output(_output: &str) -> WindowListResult {
-
     list_windows_xcap()
 }
-
 
 fn capture_window_kde_wayland(window_info: &WindowInfo) -> WindowCaptureBackendResult {
     let temp_path = format!("/tmp/screenshot_gnome_{}.png", std::process::id());
 
-
-    let geometry = format!(
-        "{},{},{}x{}",
-        window_info.x, window_info.y, window_info.width, window_info.height
-    );
-
-
     let spectacle_result = Command::new("spectacle")
-        .args([
-            "-r",
-            "-b",
-            "-n",
-            "-o", &temp_path,
-        ])
+        .args(["-r", "-b", "-n", "-o", &temp_path])
         .output();
 
-
-
     let spectacle_window = Command::new("spectacle")
-        .args([
-            "-a",
-            "-b",
-            "-n",
-            "-o", &temp_path,
-        ])
+        .args(["-a", "-b", "-n", "-o", &temp_path])
         .output();
 
     if let Ok(output) = spectacle_window {
@@ -944,7 +805,6 @@ fn capture_window_kde_wayland(window_info: &WindowInfo) -> WindowCaptureBackendR
             }
         }
     }
-
 
     let grim_geometry = format!(
         "{},{} {}x{}",
@@ -967,15 +827,9 @@ fn capture_window_kde_wayland(window_info: &WindowInfo) -> WindowCaptureBackendR
         }
     }
 
-
     let _ = spectacle_result;
     capture_window_xcap(window_info)
 }
-
-
-
-
-
 
 fn list_windows_xcap() -> WindowListResult {
     use xcap::Window;
@@ -1008,7 +862,6 @@ fn list_windows_xcap() -> WindowListResult {
     Ok(window_infos)
 }
 
-
 fn capture_window_xcap(window_info: &WindowInfo) -> WindowCaptureBackendResult {
     use xcap::Window;
 
@@ -1016,19 +869,16 @@ fn capture_window_xcap(window_info: &WindowInfo) -> WindowCaptureBackendResult {
         WindowCaptureError::EnumerationFailed(format!("xcap failed to list windows: {}", e))
     })?;
 
-
     let window = windows
         .iter()
         .find(|w| w.id().ok() == Some(window_info.id))
         .or_else(|| {
-
             windows.iter().find(|w| {
                 w.title().ok().as_deref() == Some(&window_info.title)
                     && w.app_name().ok().as_deref() == Some(&window_info.app_name)
             })
         })
         .or_else(|| {
-
             windows.iter().find(|w| {
                 w.x().ok() == Some(window_info.x)
                     && w.y().ok() == Some(window_info.y)
@@ -1055,21 +905,14 @@ fn capture_window_xcap(window_info: &WindowInfo) -> WindowCaptureBackendResult {
     })
 }
 
-
-
-
-
-
 fn load_pixbuf_from_file(path: &str) -> Result<Pixbuf, WindowCaptureError> {
     Pixbuf::from_file(path)
         .map_err(|e| WindowCaptureError::ConversionFailed(format!("Failed to load image: {}", e)))
 }
 
-
 fn crop_pixbuf(pixbuf: &Pixbuf, x: i32, y: i32, width: i32, height: i32) -> Option<Pixbuf> {
     let src_width = pixbuf.width();
     let src_height = pixbuf.height();
-
 
     let x = x.max(0).min(src_width - 1);
     let y = y.max(0).min(src_height - 1);
@@ -1082,7 +925,6 @@ fn crop_pixbuf(pixbuf: &Pixbuf, x: i32, y: i32, width: i32, height: i32) -> Opti
 
     Some(pixbuf.new_subpixbuf(x, y, width, height))
 }
-
 
 fn rgba_image_to_pixbuf(image: image::RgbaImage) -> Result<Pixbuf, WindowCaptureError> {
     let width = image.width() as i32;
@@ -1148,7 +990,6 @@ mod tests {
         let session = DesktopSession::detect();
         println!("Testing window list for: {}", session);
         println!("Using backend: {}", session.window_list_backend());
-
 
         let result = list_windows_for_session(&session);
         match result {
