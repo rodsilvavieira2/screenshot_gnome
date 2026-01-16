@@ -164,6 +164,22 @@ pub fn get_desktop_session() -> DesktopSession {
     DesktopSession::detect()
 }
 
+/// Captures a window using the smart backend selection based on WindowInfo.
+///
+/// This function uses the appropriate backend for the current desktop environment
+/// to capture the window. It should be used with WindowInfo obtained from
+/// `list_capturable_windows()`.
+pub fn capture_window(window_info: &WindowInfo) -> Result<WindowCaptureResult, WindowCaptureError> {
+    let session = DesktopSession::detect();
+    println!(
+        "Capturing window '{}' using {} backend",
+        window_info.display_label(),
+        session.window_list_backend()
+    );
+
+    window_backends::capture_window_for_session(&session, window_info)
+}
+
 pub fn capture_window_by_index(index: usize) -> Result<WindowCaptureResult, WindowCaptureError> {
     let windows =
         Window::all().map_err(|e| WindowCaptureError::EnumerationFailed(e.to_string()))?;

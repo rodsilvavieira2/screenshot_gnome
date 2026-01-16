@@ -15,13 +15,26 @@ This project is a Rust-based screenshot and image annotation tool for GNOME, bui
 The application automatically detects the desktop session to use the appropriate method for listing windows:
 
 ### Supported Environments
-| Desktop Environment | Display Server | Backend Used |
-|---------------------|----------------|--------------|
-| Hyprland | Wayland | `hyprctl clients -j` |
-| Sway | Wayland | `swaymsg -t get_tree` |
-| GNOME | Wayland | D-Bus (`org.gnome.Shell.Introspect`) |
-| KDE Plasma | Wayland | D-Bus/kdotool |
-| Any | X11 | xcap library |
+| Desktop Environment | Display Server | Window Listing | Window Capture |
+|---------------------|----------------|----------------|----------------|
+| Hyprland | Wayland | `hyprctl clients -j` | `grim -g` |
+| Sway | Wayland | `swaymsg -t get_tree` | `grim -g` |
+| GNOME | Wayland | D-Bus (`org.gnome.Shell.Introspect`) | `gnome-screenshot` / `grim` |
+| KDE Plasma | Wayland | D-Bus/kdotool | `spectacle` / `grim` |
+| Any | X11 | xcap library | xcap library |
+
+### Runtime Dependencies
+For window capture to work on Wayland, install the appropriate screenshot tool:
+
+| Environment | Required Package |
+|-------------|------------------|
+| Hyprland | `grim` |
+| Sway | `grim` |
+| GNOME Wayland | `gnome-screenshot` or `grim` |
+| KDE Wayland | `spectacle` or `grim` |
+| X11 | None (uses xcap) |
+
+**Note:** On Wayland, direct window capture is restricted for security reasons. The application uses compositor-specific tools to capture window regions.
 
 ### Key Types
 - `DesktopSession`: Combined detection result with `display_server` and `desktop_environment`.
@@ -32,6 +45,7 @@ The application automatically detects the desktop session to use the appropriate
 ### Usage
 ```rust
 use crate::capture::desktop::DesktopSession;
+use crate::capture::window::{list_capturable_windows, capture_window};
 
 let session = DesktopSession::detect();
 println!("Running on: {}", session); // e.g., "GNOME on Wayland"
@@ -39,6 +53,12 @@ println!("Backend: {}", session.window_list_backend()); // e.g., "GNOME Wayland 
 
 // Use the smart window listing (auto-selects backend)
 let windows = list_capturable_windows()?;
+
+// Capture a specific window using the appropriate backend
+if let Some(window_info) = windows.first() {
+    let result = capture_window(window_info)?;
+    // result.pixbuf contains the captured image
+}
 ```
 
 ## Key Developer Workflows

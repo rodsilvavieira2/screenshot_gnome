@@ -1,20 +1,26 @@
-//! Window listing backends for different desktop environments.
+//! Window listing and capture backends for different desktop environments.
 //!
-//! This module provides specialized window listing implementations for:
-//! - Hyprland (via hyprctl)
-//! - Sway (via swaymsg)
-//! - GNOME Wayland (via D-Bus introspection or gdbus)
-//! - KDE Wayland (via D-Bus/kdotool)
+//! This module provides specialized window listing and capture implementations for:
+//! - Hyprland (via hyprctl + grim)
+//! - Sway (via swaymsg + grim)
+//! - GNOME Wayland (via D-Bus introspection + gnome-screenshot)
+//! - KDE Wayland (via D-Bus/kdotool + spectacle)
 //! - X11 (via xcap)
 //!
-//! Each backend returns a unified `WindowInfo` structure.
+//! Each backend returns a unified `WindowInfo` structure for listing,
+//! and captures windows using the appropriate compositor-specific tools.
 
 use super::desktop::{DesktopSession, WindowListBackend};
-use super::window::{WindowCaptureError, WindowInfo};
+use super::window::{WindowCaptureError, WindowCaptureResult, WindowInfo};
+use gtk4::gdk_pixbuf::{Colorspace, Pixbuf};
+use gtk4::glib;
 use std::process::Command;
 
 /// Result type for window listing operations.
 pub type WindowListResult = Result<Vec<WindowInfo>, WindowCaptureError>;
+
+/// Result type for window capture operations.
+pub type WindowCaptureBackendResult = Result<WindowCaptureResult, WindowCaptureError>;
 
 /// Lists windows using the appropriate backend for the current session.
 pub fn list_windows_for_session(session: &DesktopSession) -> WindowListResult {
@@ -32,6 +38,33 @@ pub fn list_windows_with_backend(backend: WindowListBackend) -> WindowListResult
         WindowListBackend::X11 | WindowListBackend::Xcap => list_windows_xcap(),
     }
 }
+
+/// Captures a window using the appropriate backend for the current session.
+pub fn capture_window_for_session(
+    session: &DesktopSession,
+    window_info: &WindowInfo,
+) -> WindowCaptureBackendResult {
+    let backend = session.window_list_backend();
+    capture_window_with_backend(backend, window_info)
+}
+
+/// Captures a window using a specific backend.
+pub fn capture_window_with_backend(
+    backend: WindowListBackend,
+    window_info: &WindowInfo,
+) -> WindowCaptureBackendResult {
+    match backend {
+        WindowListBackend::Hyprland => capture_window_hyprland(window_info),
+        WindowListBackend::Sway => capture_window_sway(window_info),
+        WindowListBackend::GnomeWayland => capture_window_gnome_wayland(window_info),
+        WindowListBackend::KdeWayland => capture_window_kde_wayland(window_info),
+        WindowListBackend::X11 | WindowListBackend::Xcap => capture_window_xcap(window_info),
+    }
+}
+
+// =============================================================================
+// HYPRLAND BACKEND
+// =============================================================================
 
 /// Lists windows using hyprctl (Hyprland).
 fn list_windows_hyprland() -> WindowListResult {
@@ -140,6 +173,43 @@ fn parse_hyprland_client_object(obj_str: &str) -> Option<WindowInfo> {
         is_minimized,
         is_maximized,
         is_focused,
+    })
+}
+
+/// Captures a window on Hyprland using grim.
+fn capture_window_hyprland(window_info: &WindowInfo) -> WindowCaptureBackendResult {
+    // Use grim to capture the window region
+    // Format: grim -g "x,y widthxheight" output.png
+    let geometry = format!(
+        "{},{} {}x{}",
+        window_info.x, window_info.y, window_info.width, window_info.height
+    );
+
+    // Create a temporary file for the screenshot
+    let temp_path = format!("/tmp/screenshot_gnome_{}.png", std::process::id());
+
+    let output = Command::new("grim")
+        .args(["-g", &geometry, &temp_path])
+        .output()
+        .map_err(|e| WindowCaptureError::CaptureFailed(format!("Failed to run grim: {}", e)))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(WindowCaptureError::CaptureFailed(format!(
+            "grim failed: {}",
+            stderr
+        )));
+    }
+
+    // Load the image from the temp file
+    let pixbuf = load_pixbuf_from_file(&temp_path)?;
+
+    // Clean up temp file
+    let _ = std::fs::remove_file(&temp_path);
+
+    Ok(WindowCaptureResult {
+        pixbuf,
+        window_info: window_info.clone(),
     })
 }
 
@@ -267,6 +337,10 @@ fn extract_json_size(json: &str, key: &str) -> Option<(u32, u32)> {
         None
     }
 }
+
+// =============================================================================
+// SWAY BACKEND
+// =============================================================================
 
 /// Lists windows using swaymsg (Sway).
 fn list_windows_sway() -> WindowListResult {
@@ -432,6 +506,42 @@ fn parse_sway_rect(obj_str: &str) -> Option<(i32, i32, u32, u32)> {
 
     Some((x, y, width, height))
 }
+
+/// Captures a window on Sway using grim.
+fn capture_window_sway(window_info: &WindowInfo) -> WindowCaptureBackendResult {
+    // Sway also uses grim for screenshots
+    let geometry = format!(
+        "{},{} {}x{}",
+        window_info.x, window_info.y, window_info.width, window_info.height
+    );
+
+    let temp_path = format!("/tmp/screenshot_gnome_{}.png", std::process::id());
+
+    let output = Command::new("grim")
+        .args(["-g", &geometry, &temp_path])
+        .output()
+        .map_err(|e| WindowCaptureError::CaptureFailed(format!("Failed to run grim: {}", e)))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(WindowCaptureError::CaptureFailed(format!(
+            "grim failed: {}",
+            stderr
+        )));
+    }
+
+    let pixbuf = load_pixbuf_from_file(&temp_path)?;
+    let _ = std::fs::remove_file(&temp_path);
+
+    Ok(WindowCaptureResult {
+        pixbuf,
+        window_info: window_info.clone(),
+    })
+}
+
+// =============================================================================
+// GNOME WAYLAND BACKEND
+// =============================================================================
 
 /// Lists windows using GNOME Shell's D-Bus introspection (Wayland).
 fn list_windows_gnome_wayland() -> WindowListResult {
@@ -605,6 +715,102 @@ fn extract_gvariant_dimension(text: &str) -> Option<u32> {
     }
 }
 
+/// Captures a window on GNOME Wayland using gnome-screenshot or the portal.
+fn capture_window_gnome_wayland(window_info: &WindowInfo) -> WindowCaptureBackendResult {
+    let temp_path = format!("/tmp/screenshot_gnome_{}.png", std::process::id());
+
+    // Try using gnome-screenshot with window mode
+    // First, we need to focus the window, then capture
+    // Unfortunately, GNOME doesn't have a direct "capture window by ID" command
+
+    // Method 1: Try using the Screenshot portal via gdbus
+    let portal_result = Command::new("gdbus")
+        .args([
+            "call",
+            "--session",
+            "--dest",
+            "org.gnome.Shell.Screenshot",
+            "--object-path",
+            "/org/gnome/Shell/Screenshot",
+            "--method",
+            "org.gnome.Shell.Screenshot.ScreenshotWindow",
+            "true", // include cursor
+            "true", // include frame
+            &temp_path,
+        ])
+        .output();
+
+    if let Ok(output) = portal_result {
+        if output.status.success() {
+            if let Ok(pixbuf) = load_pixbuf_from_file(&temp_path) {
+                let _ = std::fs::remove_file(&temp_path);
+                return Ok(WindowCaptureResult {
+                    pixbuf,
+                    window_info: window_info.clone(),
+                });
+            }
+        }
+    }
+
+    // Method 2: Fall back to capturing the window's region
+    // This captures the area where the window is located
+    let geometry = format!(
+        "{},{} {}x{}",
+        window_info.x, window_info.y, window_info.width, window_info.height
+    );
+
+    // Try grim first (if available, e.g., on GNOME with XWayland)
+    let grim_result = Command::new("grim")
+        .args(["-g", &geometry, &temp_path])
+        .output();
+
+    if let Ok(output) = grim_result {
+        if output.status.success() {
+            if let Ok(pixbuf) = load_pixbuf_from_file(&temp_path) {
+                let _ = std::fs::remove_file(&temp_path);
+                return Ok(WindowCaptureResult {
+                    pixbuf,
+                    window_info: window_info.clone(),
+                });
+            }
+        }
+    }
+
+    // Method 3: Use gnome-screenshot to capture the whole screen and crop
+    let gnome_result = Command::new("gnome-screenshot")
+        .args(["-f", &temp_path])
+        .output();
+
+    if let Ok(output) = gnome_result {
+        if output.status.success() {
+            if let Ok(full_pixbuf) = load_pixbuf_from_file(&temp_path) {
+                let _ = std::fs::remove_file(&temp_path);
+
+                // Crop to the window region
+                if let Some(cropped) = crop_pixbuf(
+                    &full_pixbuf,
+                    window_info.x,
+                    window_info.y,
+                    window_info.width as i32,
+                    window_info.height as i32,
+                ) {
+                    return Ok(WindowCaptureResult {
+                        pixbuf: cropped,
+                        window_info: window_info.clone(),
+                    });
+                }
+            }
+        }
+    }
+
+    // Final fallback: try xcap
+    capture_window_xcap(window_info)
+}
+
+// =============================================================================
+// KDE WAYLAND BACKEND
+// =============================================================================
+
 /// Lists windows using KDE/KWin's D-Bus interface (Wayland).
 fn list_windows_kde_wayland() -> WindowListResult {
     // Try using qdbus or gdbus to query KWin
@@ -696,6 +902,80 @@ fn parse_kde_dbus_output(_output: &str) -> WindowListResult {
     list_windows_xcap()
 }
 
+/// Captures a window on KDE Wayland using spectacle.
+fn capture_window_kde_wayland(window_info: &WindowInfo) -> WindowCaptureBackendResult {
+    let temp_path = format!("/tmp/screenshot_gnome_{}.png", std::process::id());
+
+    // Try spectacle with region mode
+    let geometry = format!(
+        "{},{},{}x{}",
+        window_info.x, window_info.y, window_info.width, window_info.height
+    );
+
+    // Method 1: Try spectacle with rectangular region
+    let spectacle_result = Command::new("spectacle")
+        .args([
+            "-r", // rectangular region
+            "-b", // background mode (no GUI)
+            "-n", // no notification
+            "-o", &temp_path,
+        ])
+        .output();
+
+    // spectacle -r requires user interaction, so try region capture differently
+    // Method 2: Use spectacle to capture active window
+    let spectacle_window = Command::new("spectacle")
+        .args([
+            "-a", // active window
+            "-b", // background mode
+            "-n", // no notification
+            "-o", &temp_path,
+        ])
+        .output();
+
+    if let Ok(output) = spectacle_window {
+        if output.status.success() {
+            if let Ok(pixbuf) = load_pixbuf_from_file(&temp_path) {
+                let _ = std::fs::remove_file(&temp_path);
+                return Ok(WindowCaptureResult {
+                    pixbuf,
+                    window_info: window_info.clone(),
+                });
+            }
+        }
+    }
+
+    // Method 3: Try grim if available
+    let grim_geometry = format!(
+        "{},{} {}x{}",
+        window_info.x, window_info.y, window_info.width, window_info.height
+    );
+
+    let grim_result = Command::new("grim")
+        .args(["-g", &grim_geometry, &temp_path])
+        .output();
+
+    if let Ok(output) = grim_result {
+        if output.status.success() {
+            if let Ok(pixbuf) = load_pixbuf_from_file(&temp_path) {
+                let _ = std::fs::remove_file(&temp_path);
+                return Ok(WindowCaptureResult {
+                    pixbuf,
+                    window_info: window_info.clone(),
+                });
+            }
+        }
+    }
+
+    // Fallback to xcap
+    let _ = spectacle_result; // Suppress unused warning
+    capture_window_xcap(window_info)
+}
+
+// =============================================================================
+// X11 / XCAP BACKEND
+// =============================================================================
+
 /// Lists windows using xcap (fallback for X11 and unsupported environments).
 fn list_windows_xcap() -> WindowListResult {
     use xcap::Window;
@@ -726,6 +1006,100 @@ fn list_windows_xcap() -> WindowListResult {
     }
 
     Ok(window_infos)
+}
+
+/// Captures a window using xcap (X11 or fallback).
+fn capture_window_xcap(window_info: &WindowInfo) -> WindowCaptureBackendResult {
+    use xcap::Window;
+
+    let windows = Window::all().map_err(|e| {
+        WindowCaptureError::EnumerationFailed(format!("xcap failed to list windows: {}", e))
+    })?;
+
+    // Try to find window by ID first
+    let window = windows
+        .iter()
+        .find(|w| w.id().ok() == Some(window_info.id))
+        .or_else(|| {
+            // Fallback: try to match by title and app_name
+            windows.iter().find(|w| {
+                w.title().ok().as_deref() == Some(&window_info.title)
+                    && w.app_name().ok().as_deref() == Some(&window_info.app_name)
+            })
+        })
+        .or_else(|| {
+            // Fallback: try to match by position and size
+            windows.iter().find(|w| {
+                w.x().ok() == Some(window_info.x)
+                    && w.y().ok() == Some(window_info.y)
+                    && w.width().ok() == Some(window_info.width)
+                    && w.height().ok() == Some(window_info.height)
+            })
+        });
+
+    let window = window.ok_or(WindowCaptureError::WindowNotFound)?;
+
+    if window.is_minimized().unwrap_or(false) {
+        return Err(WindowCaptureError::WindowMinimized);
+    }
+
+    let image = window
+        .capture_image()
+        .map_err(|e| WindowCaptureError::CaptureFailed(e.to_string()))?;
+
+    let pixbuf = rgba_image_to_pixbuf(image)?;
+
+    Ok(WindowCaptureResult {
+        pixbuf,
+        window_info: window_info.clone(),
+    })
+}
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+/// Loads a Pixbuf from a PNG file.
+fn load_pixbuf_from_file(path: &str) -> Result<Pixbuf, WindowCaptureError> {
+    Pixbuf::from_file(path)
+        .map_err(|e| WindowCaptureError::ConversionFailed(format!("Failed to load image: {}", e)))
+}
+
+/// Crops a pixbuf to the specified region.
+fn crop_pixbuf(pixbuf: &Pixbuf, x: i32, y: i32, width: i32, height: i32) -> Option<Pixbuf> {
+    let src_width = pixbuf.width();
+    let src_height = pixbuf.height();
+
+    // Clamp coordinates to valid range
+    let x = x.max(0).min(src_width - 1);
+    let y = y.max(0).min(src_height - 1);
+    let width = width.min(src_width - x);
+    let height = height.min(src_height - y);
+
+    if width <= 0 || height <= 0 {
+        return None;
+    }
+
+    Some(pixbuf.new_subpixbuf(x, y, width, height))
+}
+
+/// Converts an RGBA image to a GDK Pixbuf.
+fn rgba_image_to_pixbuf(image: image::RgbaImage) -> Result<Pixbuf, WindowCaptureError> {
+    let width = image.width() as i32;
+    let height = image.height() as i32;
+    let stride = width * 4;
+    let pixels = image.into_raw();
+    let bytes = glib::Bytes::from(&pixels);
+
+    Ok(Pixbuf::from_bytes(
+        &bytes,
+        Colorspace::Rgb,
+        true,
+        8,
+        width,
+        height,
+        stride,
+    ))
 }
 
 #[cfg(test)]

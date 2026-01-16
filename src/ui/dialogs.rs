@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use crate::app::AppState;
 use crate::capture::desktop::DesktopSession;
-use crate::capture::{capture_window_by_id, list_capturable_windows};
+use crate::capture::window::{capture_window, list_capturable_windows, WindowInfo};
 
 pub struct TextPopoverComponents {
     pub text_popover: gtk::Popover,
@@ -159,12 +159,11 @@ pub fn show_window_selector(
     vbox.append(&scrolled_window);
     window_selector.set_child(Some(&vbox));
 
-    let window_ids: Rc<RefCell<Vec<u32>>> = Rc::new(RefCell::new(Vec::new()));
+    // Store full WindowInfo objects instead of just IDs
+    let window_infos: Rc<RefCell<Vec<WindowInfo>>> = Rc::new(RefCell::new(Vec::new()));
 
     if let Ok(windows) = list_capturable_windows() {
-        for win_info in &windows {
-            window_ids.borrow_mut().push(win_info.id);
-
+        for win_info in windows {
             let row = gtk::Box::builder()
                 .orientation(Orientation::Horizontal)
                 .spacing(12)
@@ -185,6 +184,9 @@ pub fn show_window_selector(
             row.append(&label);
 
             list_box.append(&row);
+
+            // Store the full WindowInfo for capture
+            window_infos.borrow_mut().push(win_info);
         }
     }
 
@@ -193,26 +195,49 @@ pub fn show_window_selector(
         let drawing_area = drawing_area.clone();
         let placeholder_icon = placeholder_icon.clone();
         let window_selector = window_selector.clone();
-        let window_ids = window_ids.clone();
+        let window_infos = window_infos.clone();
         let tools_box = tools_box.clone();
         move |_lb, row| {
             let idx = row.index();
             if idx >= 0 {
-                let ids = window_ids.borrow();
-                if let Some(&window_id) = ids.get(idx as usize) {
-                    if let Ok(result) = capture_window_by_id(window_id) {
-                        let mut s = state.borrow_mut();
-                        s.final_image = Some(result.pixbuf);
-                        s.is_active = false;
-                        s.editor.reset();
+                let infos = window_infos.borrow();
+                if let Some(window_info) = infos.get(idx as usize) {
+                    // Use the new capture_window function with smart backend selection
+                    match capture_window(window_info) {
+                        Ok(result) => {
+                            let mut s = state.borrow_mut();
+                            s.final_image = Some(result.pixbuf);
+                            s.is_active = false;
+                            s.editor.reset();
 
-                        placeholder_icon.set_visible(false);
-                        drawing_area.queue_draw();
-                        tools_box.set_visible(true);
+                            placeholder_icon.set_visible(false);
+                            drawing_area.queue_draw();
+                            tools_box.set_visible(true);
+                            window_selector.close();
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to capture window: {}", e);
+
+                            // Show error dialog to user
+                            let error_dialog = gtk::AlertDialog::builder()
+                                .modal(true)
+                                .message("Failed to Capture Window")
+                                .detail(&format!(
+                                    "Could not capture the selected window.\n\nError: {}\n\n\
+                                    Tip: Make sure the required screenshot tool is installed:\n\
+                                    • Hyprland/Sway: grim\n\
+                                    • GNOME: gnome-screenshot\n\
+                                    • KDE: spectacle",
+                                    e
+                                ))
+                                .buttons(["OK"])
+                                .build();
+
+                            error_dialog.show(Some(&window_selector));
+                        }
                     }
                 }
             }
-            window_selector.close();
         }
     });
 
