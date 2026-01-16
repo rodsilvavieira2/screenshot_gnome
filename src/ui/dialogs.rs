@@ -6,6 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::app::AppState;
+use crate::capture::desktop::DesktopSession;
 use crate::capture::{capture_window_by_id, list_capturable_windows};
 
 pub struct TextPopoverComponents {
@@ -141,7 +142,20 @@ pub fn show_window_selector(
         .margin_end(12)
         .build();
 
+    // Detect and display desktop session info
+    let session = DesktopSession::detect();
+    let session_label = gtk::Label::builder()
+        .label(&format!(
+            "Session: {} • Backend: {}",
+            session,
+            session.window_list_backend()
+        ))
+        .css_classes(["dim-label"])
+        .halign(Align::Start)
+        .build();
+
     vbox.append(&gtk::Label::new(Some("Select a window to capture:")));
+    vbox.append(&session_label);
     vbox.append(&scrolled_window);
     window_selector.set_child(Some(&vbox));
 

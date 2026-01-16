@@ -4,6 +4,9 @@ use gtk4::gdk_pixbuf::{Colorspace, Pixbuf};
 use gtk4::glib;
 use xcap::Window;
 
+use super::desktop::DesktopSession;
+use super::window_backends;
+
 #[derive(Debug, Clone)]
 pub struct WindowInfo {
     pub id: u32,
@@ -103,6 +106,21 @@ impl std::fmt::Display for WindowCaptureError {
 impl std::error::Error for WindowCaptureError {}
 
 pub fn list_capturable_windows() -> Result<Vec<WindowInfo>, WindowCaptureError> {
+    let session = DesktopSession::detect();
+    println!(
+        "Detected session: {} (using {} backend)",
+        session,
+        session.window_list_backend()
+    );
+
+    let windows = window_backends::list_windows_for_session(&session)?;
+
+    let capturable: Vec<WindowInfo> = windows.into_iter().filter(|w| !w.is_minimized).collect();
+
+    Ok(capturable)
+}
+
+pub fn list_capturable_windows_xcap() -> Result<Vec<WindowInfo>, WindowCaptureError> {
     let windows =
         Window::all().map_err(|e| WindowCaptureError::EnumerationFailed(e.to_string()))?;
 
@@ -121,6 +139,11 @@ pub fn list_capturable_windows() -> Result<Vec<WindowInfo>, WindowCaptureError> 
 }
 
 pub fn list_all_windows() -> Result<Vec<WindowInfo>, WindowCaptureError> {
+    let session = DesktopSession::detect();
+    window_backends::list_windows_for_session(&session)
+}
+
+pub fn list_all_windows_xcap() -> Result<Vec<WindowInfo>, WindowCaptureError> {
     let windows =
         Window::all().map_err(|e| WindowCaptureError::EnumerationFailed(e.to_string()))?;
 
@@ -134,6 +157,11 @@ pub fn list_all_windows() -> Result<Vec<WindowInfo>, WindowCaptureError> {
     }
 
     Ok(window_infos)
+}
+
+/// Returns information about the current desktop session.
+pub fn get_desktop_session() -> DesktopSession {
+    DesktopSession::detect()
 }
 
 pub fn capture_window_by_index(index: usize) -> Result<WindowCaptureResult, WindowCaptureError> {
