@@ -18,7 +18,7 @@ impl std::fmt::Display for DisplayServer {
     }
 }
 
-/// The desktop environment in use.
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DesktopEnvironment {
     Gnome,
@@ -266,7 +266,7 @@ mod tests {
 
     #[test]
     fn test_desktop_session_detect() {
-        // This test will pass regardless of the actual environment
+
         let session = DesktopSession::detect();
         println!("Detected session: {}", session);
         println!("Backend: {}", session.window_list_backend());

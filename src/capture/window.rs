@@ -159,16 +159,16 @@ pub fn list_all_windows_xcap() -> Result<Vec<WindowInfo>, WindowCaptureError> {
     Ok(window_infos)
 }
 
-/// Returns information about the current desktop session.
+
 pub fn get_desktop_session() -> DesktopSession {
     DesktopSession::detect()
 }
 
-/// Captures a window using the smart backend selection based on WindowInfo.
-///
-/// This function uses the appropriate backend for the current desktop environment
-/// to capture the window. It should be used with WindowInfo obtained from
-/// `list_capturable_windows()`.
+
+
+
+
+
 pub fn capture_window(window_info: &WindowInfo) -> Result<WindowCaptureResult, WindowCaptureError> {
     let session = DesktopSession::detect();
     println!(
