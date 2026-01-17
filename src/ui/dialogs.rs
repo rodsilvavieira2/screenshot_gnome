@@ -142,7 +142,6 @@ pub fn show_window_selector(
         .margin_end(12)
         .build();
 
-
     let session = DesktopSession::detect();
     let session_label = gtk::Label::builder()
         .label(&format!(
@@ -158,7 +157,6 @@ pub fn show_window_selector(
     vbox.append(&session_label);
     vbox.append(&scrolled_window);
     window_selector.set_child(Some(&vbox));
-
 
     let window_infos: Rc<RefCell<Vec<WindowInfo>>> = Rc::new(RefCell::new(Vec::new()));
 
@@ -185,7 +183,6 @@ pub fn show_window_selector(
 
             list_box.append(&row);
 
-
             window_infos.borrow_mut().push(win_info);
         }
     }
@@ -202,7 +199,6 @@ pub fn show_window_selector(
             if idx >= 0 {
                 let infos = window_infos.borrow();
                 if let Some(window_info) = infos.get(idx as usize) {
-
                     match capture_window(window_info) {
                         Ok(result) => {
                             let mut s = state.borrow_mut();
@@ -217,7 +213,6 @@ pub fn show_window_selector(
                         }
                         Err(e) => {
                             eprintln!("Failed to capture window: {}", e);
-
 
                             let error_dialog = gtk::AlertDialog::builder()
                                 .modal(true)
