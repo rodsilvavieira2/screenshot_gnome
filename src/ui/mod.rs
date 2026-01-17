@@ -4,22 +4,6 @@ pub mod handlers;
 pub mod header;
 pub mod toolbar;
 
-#[allow(unused_imports)]
-pub use dialogs::{
-    connect_text_popover, create_text_popover, show_window_selector, TextPopoverComponents,
-};
-#[allow(unused_imports)]
-pub use drawing::{create_drawing_area, DrawingComponents};
-#[allow(unused_imports)]
-pub use handlers::{connect_all_handlers, UiComponents};
-#[allow(unused_imports)]
-pub use header::{create_header_bar, HeaderComponents};
-#[allow(unused_imports)]
-pub use toolbar::{
-    connect_tool_buttons, create_crop_toolbar, create_toolbar, CropToolbarComponents,
-    ToolbarComponents,
-};
-
 use gtk4 as gtk;
 use libadwaita as adw;
 
