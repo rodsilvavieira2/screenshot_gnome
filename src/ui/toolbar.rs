@@ -15,6 +15,7 @@ pub struct ToolbarComponents {
     pub tool_rectangle_btn: gtk::ToggleButton,
     pub tool_crop_btn: gtk::ToggleButton,
     pub tool_text_btn: gtk::ToggleButton,
+    pub tool_color_picker_btn: gtk::ToggleButton,
     pub color_button: gtk::ColorDialogButton,
     pub color_picker_circle: gtk::DrawingArea,
     pub undo_btn: gtk::Button,
@@ -74,6 +75,13 @@ pub fn create_toolbar(state: &Rc<RefCell<AppState>>) -> ToolbarComponents {
         .build();
     tool_text_btn.add_css_class("flat");
 
+    let tool_color_picker_btn = gtk::ToggleButton::builder()
+        .icon_name("color-select-symbolic")
+        .tooltip_text("Pick Color")
+        .group(&tool_pointer_btn)
+        .build();
+    tool_color_picker_btn.add_css_class("flat");
+
     let tool_buttons_box = gtk::Box::builder()
         .orientation(Orientation::Horizontal)
         .spacing(6)
@@ -86,6 +94,7 @@ pub fn create_toolbar(state: &Rc<RefCell<AppState>>) -> ToolbarComponents {
     tool_buttons_box.append(&tool_rectangle_btn);
     tool_buttons_box.append(&tool_crop_btn);
     tool_buttons_box.append(&tool_text_btn);
+    tool_buttons_box.append(&tool_color_picker_btn);
     tool_buttons_box.append(&color_button);
 
     let undo_btn = gtk::Button::builder()
@@ -128,6 +137,7 @@ pub fn create_toolbar(state: &Rc<RefCell<AppState>>) -> ToolbarComponents {
         tool_rectangle_btn,
         tool_crop_btn,
         tool_text_btn,
+        tool_color_picker_btn,
         color_button,
         color_picker_circle,
         undo_btn,
@@ -282,6 +292,17 @@ pub fn connect_tool_buttons(
             if btn.is_active() {
                 let mut s = state.borrow_mut();
                 s.editor.set_tool(EditorTool::Text);
+                s.is_crop_mode = false;
+            }
+        }
+    });
+
+    components.tool_color_picker_btn.connect_toggled({
+        let state = state.clone();
+        move |btn| {
+            if btn.is_active() {
+                let mut s = state.borrow_mut();
+                s.editor.set_tool(EditorTool::ColorPicker);
                 s.is_crop_mode = false;
             }
         }

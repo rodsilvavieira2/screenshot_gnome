@@ -358,11 +358,7 @@ pub fn connect_click_handlers(state: &Rc<RefCell<AppState>>, components: &UiComp
                         return;
                     }
 
-                    s.editor.pending_text = Some(crate::editor::PendingText {
-                        x: img_x,
-                        y: img_y,
-                        text: String::new(),
-                    });
+                    s.editor.pending_text = Some(crate::editor::PendingText { x: img_x, y: img_y });
                     drop(s);
 
                     text_entry.set_text("");

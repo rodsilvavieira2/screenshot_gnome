@@ -74,11 +74,6 @@ impl RectangleAnnotation {
         self.x += dx;
         self.y += dy;
     }
-
-    pub fn set_position(&mut self, x: f64, y: f64) {
-        self.x = x;
-        self.y = y;
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -158,7 +153,6 @@ pub struct TextAnnotation {
     pub text: String,
     pub color: RGBA,
     pub font_size: f64,
-    pub font_family: String,
 }
 
 impl TextAnnotation {
@@ -169,7 +163,6 @@ impl TextAnnotation {
             text,
             color,
             font_size,
-            font_family: "Sans".to_string(),
         }
     }
 
@@ -188,11 +181,6 @@ impl TextAnnotation {
     pub fn move_by(&mut self, dx: f64, dy: f64) {
         self.x += dx;
         self.y += dy;
-    }
-
-    pub fn set_position(&mut self, x: f64, y: f64) {
-        self.x = x;
-        self.y = y;
     }
 }
 
@@ -428,10 +416,6 @@ impl AnnotationList {
         }
     }
 
-    pub fn clear_current(&mut self) {
-        self.current_annotation = None;
-    }
-
     pub fn undo(&mut self) -> bool {
         self.selected_index = None;
         self.annotations.pop().is_some()
@@ -443,20 +427,8 @@ impl AnnotationList {
         self.selected_index = None;
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &Annotation> {
-        self.annotations.iter()
-    }
-
     pub fn current(&self) -> Option<&Annotation> {
         self.current_annotation.as_ref()
-    }
-
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut Annotation> {
-        self.annotations.get_mut(index)
-    }
-
-    pub fn selected_index(&self) -> Option<usize> {
-        self.selected_index
     }
 
     pub fn set_selected(&mut self, index: Option<usize>) {
@@ -506,10 +478,6 @@ impl AnnotationList {
         if let Some(current) = &self.current_annotation {
             current.draw(cr, scale, offset_x, offset_y);
         }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.annotations.is_empty() && self.current_annotation.is_none()
     }
 
     pub fn len(&self) -> usize {

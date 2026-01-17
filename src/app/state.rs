@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use gtk4 as gtk;
 
 use crate::editor::EditorState;
@@ -95,13 +93,6 @@ impl AppState {
         }
     }
 
-    pub fn reset_for_capture(&mut self) {
-        self.selection = None;
-        self.is_active = false;
-        self.is_crop_mode = false;
-        self.editor.reset();
-    }
-
     pub fn start_selection(&mut self, x: f64, y: f64) {
         self.selection = Some(Selection::new(x, y));
     }
@@ -109,18 +100,6 @@ impl AppState {
     pub fn update_selection(&mut self, end_x: f64, end_y: f64) {
         if let Some(ref mut sel) = self.selection {
             sel.update_end(end_x, end_y);
-        }
-    }
-
-    pub fn has_image(&self) -> bool {
-        self.final_image.is_some()
-    }
-
-    pub fn current_display_image(&self) -> Option<&gtk::gdk_pixbuf::Pixbuf> {
-        if self.is_active {
-            self.original_screenshot.as_ref()
-        } else {
-            self.final_image.as_ref()
         }
     }
 

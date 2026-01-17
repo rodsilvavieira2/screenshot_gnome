@@ -201,6 +201,7 @@ pub fn show_window_selector(
                 if let Some(window_info) = infos.get(idx as usize) {
                     match capture_window(window_info) {
                         Ok(result) => {
+                            println!("Captured window: {}", result.window_info.debug_info());
                             let mut s = state.borrow_mut();
                             s.final_image = Some(result.pixbuf);
                             s.is_active = false;

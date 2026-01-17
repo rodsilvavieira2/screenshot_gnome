@@ -11,41 +11,6 @@ pub enum EditorTool {
     ColorPicker,
 }
 
-impl EditorTool {
-    pub fn icon_name(&self) -> &'static str {
-        match self {
-            EditorTool::Pointer => "input-mouse-symbolic",
-            EditorTool::Pencil => "document-edit-symbolic",
-            EditorTool::Rectangle => "media-playback-stop-symbolic",
-            EditorTool::Crop => "crop-symbolic",
-            EditorTool::Text => "insert-text-symbolic",
-            EditorTool::ColorPicker => "color-select-symbolic",
-        }
-    }
-
-    pub fn tooltip(&self) -> &'static str {
-        match self {
-            EditorTool::Pointer => "Pointer",
-            EditorTool::Pencil => "Free Draw",
-            EditorTool::Rectangle => "Rectangle",
-            EditorTool::Crop => "Crop",
-            EditorTool::Text => "Add Text",
-            EditorTool::ColorPicker => "Pick Color",
-        }
-    }
-
-    pub fn all() -> &'static [EditorTool] {
-        &[
-            EditorTool::Pointer,
-            EditorTool::Pencil,
-            EditorTool::Rectangle,
-            EditorTool::Crop,
-            EditorTool::Text,
-            EditorTool::ColorPicker,
-        ]
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct ToolState {
     pub active_tool: EditorTool,
@@ -87,10 +52,6 @@ impl Default for ToolState {
 }
 
 impl ToolState {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     pub fn set_tool(&mut self, tool: EditorTool) {
         self.active_tool = tool;
         self.reset_drag();
@@ -98,14 +59,6 @@ impl ToolState {
 
     pub fn set_color(&mut self, color: RGBA) {
         self.color = color;
-    }
-
-    pub fn set_line_width(&mut self, width: f64) {
-        self.line_width = width.max(1.0).min(50.0);
-    }
-
-    pub fn set_font_size(&mut self, size: f64) {
-        self.font_size = size.max(8.0).min(200.0);
     }
 
     pub fn start_drag(&mut self, x: f64, y: f64) {
