@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use gtk4 as gtk;
 
 use gtk::{Align, Orientation};
