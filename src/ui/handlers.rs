@@ -505,7 +505,7 @@ pub fn connect_screenshot_handler(state: &Rc<RefCell<AppState>>, components: &Ui
     });
 }
 
-fn capture_screen_or_selection(
+pub fn capture_screen_or_selection(
     state: &Rc<RefCell<AppState>>,
     window: &adw::ApplicationWindow,
     header_bar: &adw::HeaderBar,

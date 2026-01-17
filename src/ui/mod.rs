@@ -28,9 +28,9 @@ use gtk::Orientation;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::app::AppState;
+use crate::app::{AppState, CaptureMode};
 
-pub fn build_ui(app: &adw::Application) {
+pub fn build_ui(app: &adw::Application, start_mode: Option<CaptureMode>) {
     let state = Rc::new(RefCell::new(AppState::new()));
 
     let header = header::create_header_bar(&state);
@@ -82,4 +82,30 @@ pub fn build_ui(app: &adw::Application) {
     handlers::connect_all_handlers(&state, &components);
 
     window.present();
+
+    if let Some(mode) = start_mode {
+        match mode {
+            CaptureMode::Selection | CaptureMode::Screen => {
+                handlers::capture_screen_or_selection(
+                    &state,
+                    &components.window,
+                    &components.header.header_bar,
+                    &components.toolbar.tools_box,
+                    &components.crop_toolbar.crop_tools_box,
+                    &components.drawing.drawing_area,
+                    &components.drawing.placeholder_icon,
+                    mode,
+                );
+            }
+            CaptureMode::Window => {
+                dialogs::show_window_selector(
+                    &state,
+                    &components.window,
+                    &components.drawing.drawing_area,
+                    &components.drawing.placeholder_icon,
+                    &components.toolbar.tools_box,
+                );
+            }
+        }
+    }
 }
