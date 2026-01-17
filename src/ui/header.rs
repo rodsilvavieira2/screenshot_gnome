@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use gtk4 as gtk;
 use libadwaita as adw;
 
@@ -13,12 +11,6 @@ use crate::app::{AppState, CaptureMode};
 pub struct HeaderComponents {
     pub header_bar: adw::HeaderBar,
     pub take_screenshot_btn: gtk::Button,
-    pub mode_selection: gtk::ToggleButton,
-    pub mode_window: gtk::ToggleButton,
-    pub mode_screen: gtk::ToggleButton,
-    pub delay_value: gtk::Label,
-    pub delay_minus: gtk::Button,
-    pub delay_plus: gtk::Button,
 }
 
 pub fn create_header_bar(state: &Rc<RefCell<AppState>>) -> HeaderComponents {
@@ -102,12 +94,6 @@ pub fn create_header_bar(state: &Rc<RefCell<AppState>>) -> HeaderComponents {
     HeaderComponents {
         header_bar,
         take_screenshot_btn,
-        mode_selection,
-        mode_window,
-        mode_screen,
-        delay_value,
-        delay_minus,
-        delay_plus,
     }
 }
 
