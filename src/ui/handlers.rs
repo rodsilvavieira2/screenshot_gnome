@@ -1,6 +1,7 @@
 use gtk::glib;
 use gtk4 as gtk;
 use libadwaita as adw;
+use log::{debug, error, info};
 
 use gtk::{GestureClick, GestureDrag};
 use gtk4::prelude::*;
@@ -35,6 +36,7 @@ pub fn connect_undo_handler(state: &Rc<RefCell<AppState>>, components: &UiCompon
         let state = state.clone();
         let drawing_area = components.drawing.drawing_area.clone();
         move |_| {
+            debug!("Undo requested");
             let mut s = state.borrow_mut();
             s.editor.undo();
             drop(s);
@@ -52,7 +54,7 @@ pub fn connect_copy_handler(state: &Rc<RefCell<AppState>>, components: &UiCompon
             if let Some(ref pixbuf) = s.final_image {
                 let clipboard_manager = ClipboardManager::from_widget(&window);
                 if clipboard_manager.copy_image(pixbuf).is_ok() {
-                    println!("Image copied to clipboard");
+                    info!("Image copied to clipboard");
                 }
             }
         }
@@ -83,9 +85,9 @@ pub fn connect_save_handler(state: &Rc<RefCell<AppState>>, components: &UiCompon
                             let s = state.borrow();
                             if let Some(ref pixbuf) = s.final_image {
                                 if let Err(e) = pixbuf.savev(path.to_str().unwrap(), "png", &[]) {
-                                    eprintln!("Failed to save image: {}", e);
+                                    error!("Failed to save image: {}", e);
                                 } else {
-                                    println!("Image saved to {:?}", path);
+                                    info!("Image saved to {:?}", path);
                                 }
                             }
                         }
@@ -98,6 +100,7 @@ pub fn connect_save_handler(state: &Rc<RefCell<AppState>>, components: &UiCompon
 }
 
 pub fn connect_drag_handlers(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
+    debug!("Connecting drag handlers");
     let drag = GestureDrag::new();
 
     drag.connect_drag_begin({
@@ -549,13 +552,14 @@ pub fn capture_screen_or_selection(
             }
         }
         Err(e) => {
-            eprintln!("Failed to capture screen: {}", e);
+            error!("Failed to capture screen: {}", e);
             window.set_visible(true);
         }
     }
 }
 
 pub fn connect_all_handlers(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
+    debug!("Initializing UI handlers");
     connect_undo_handler(state, components);
     connect_copy_handler(state, components);
     connect_save_handler(state, components);

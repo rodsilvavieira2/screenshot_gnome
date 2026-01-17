@@ -9,12 +9,14 @@ use libadwaita as adw;
 
 use adw::prelude::*;
 use gtk::Orientation;
+use log::info;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::app::{AppState, CaptureMode};
 
 pub fn build_ui(app: &adw::Application, start_mode: Option<CaptureMode>) {
+    info!("Building UI...");
     let state = Rc::new(RefCell::new(AppState::new()));
 
     let header = header::create_header_bar(&state);
@@ -65,9 +67,11 @@ pub fn build_ui(app: &adw::Application, start_mode: Option<CaptureMode>) {
 
     handlers::connect_all_handlers(&state, &components);
 
+    info!("Presenting main window");
     window.present();
 
     if let Some(mode) = start_mode {
+        info!("Starting with mode: {:?}", mode);
         match mode {
             CaptureMode::Selection | CaptureMode::Screen => {
                 handlers::capture_screen_or_selection(

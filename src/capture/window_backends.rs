@@ -2,6 +2,7 @@ use super::desktop::{DesktopSession, WindowListBackend};
 use super::window::{WindowCaptureError, WindowCaptureResult, WindowInfo};
 use gtk4::gdk_pixbuf::{Colorspace, Pixbuf};
 use gtk4::glib;
+use log::{debug, warn};
 use std::process::Command;
 
 pub type WindowListResult = Result<Vec<WindowInfo>, WindowCaptureError>;
@@ -14,6 +15,7 @@ pub fn list_windows_for_session(session: &DesktopSession) -> WindowListResult {
 }
 
 pub fn list_windows_with_backend(backend: WindowListBackend) -> WindowListResult {
+    debug!("Listing windows with backend: {:?}", backend);
     match backend {
         WindowListBackend::Hyprland => list_windows_hyprland(),
         WindowListBackend::Sway => list_windows_sway(),
@@ -35,6 +37,11 @@ pub fn capture_window_with_backend(
     backend: WindowListBackend,
     window_info: &WindowInfo,
 ) -> WindowCaptureBackendResult {
+    debug!(
+        "Capturing window with backend: {:?}, window: {}",
+        backend,
+        window_info.display_label()
+    );
     match backend {
         WindowListBackend::Hyprland => capture_window_hyprland(window_info),
         WindowListBackend::Sway => capture_window_sway(window_info),
@@ -490,7 +497,7 @@ fn list_windows_gnome_wayland() -> WindowListResult {
             parse_gnome_introspect_output(&result_str)
         }
         _ => {
-            eprintln!("GNOME Shell Introspect not available, falling back to xcap");
+            warn!("GNOME Shell Introspect not available, falling back to xcap");
             list_windows_xcap()
         }
     }
@@ -733,7 +740,7 @@ fn list_windows_kde_wayland() -> WindowListResult {
         }
     }
 
-    eprintln!("KDE window listing not available, falling back to xcap");
+    warn!("KDE window listing not available, falling back to xcap");
     list_windows_xcap()
 }
 

@@ -1,4 +1,5 @@
 use gtk4 as gtk;
+use log::{debug, error, info};
 
 use gtk::{Align, Orientation};
 use gtk4::prelude::*;
@@ -64,6 +65,7 @@ pub fn connect_text_popover(
     drawing_area: &gtk::DrawingArea,
     components: &TextPopoverComponents,
 ) {
+    debug!("Connecting text popover handlers");
     components.text_confirm_btn.connect_clicked({
         let state = state.clone();
         let drawing_area = drawing_area.clone();
@@ -201,7 +203,7 @@ pub fn show_window_selector(
                 if let Some(window_info) = infos.get(idx as usize) {
                     match capture_window(window_info) {
                         Ok(result) => {
-                            println!("Captured window: {}", result.window_info.debug_info());
+                            info!("Captured window: {}", result.window_info.debug_info());
                             let mut s = state.borrow_mut();
                             s.final_image = Some(result.pixbuf);
                             s.is_active = false;
@@ -213,7 +215,7 @@ pub fn show_window_selector(
                             window_selector.close();
                         }
                         Err(e) => {
-                            eprintln!("Failed to capture window: {}", e);
+                            error!("Failed to capture window: {}", e);
 
                             let error_dialog = gtk::AlertDialog::builder()
                                 .modal(true)

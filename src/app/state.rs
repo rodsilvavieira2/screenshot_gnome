@@ -1,4 +1,5 @@
 use gtk4 as gtk;
+use log::debug;
 
 use crate::editor::EditorState;
 
@@ -79,6 +80,7 @@ impl Default for AppState {
 
 impl AppState {
     pub fn new() -> Self {
+        debug!("Initializing AppState");
         Self {
             mode: CaptureMode::Selection,
             original_screenshot: None,
@@ -94,6 +96,7 @@ impl AppState {
     }
 
     pub fn start_selection(&mut self, x: f64, y: f64) {
+        debug!("Starting selection at ({}, {})", x, y);
         self.selection = Some(Selection::new(x, y));
     }
 
@@ -104,6 +107,7 @@ impl AppState {
     }
 
     pub fn apply_selection_crop(&mut self) -> bool {
+        debug!("Applying selection crop");
         if let Some(sel) = self.selection {
             if sel.is_significant() {
                 if let Some(ref orig) = self.original_screenshot {
@@ -125,6 +129,7 @@ impl AppState {
     }
 
     pub fn apply_editor_crop(&mut self) -> bool {
+        debug!("Applying editor crop");
         if let Some((x, y, w, h)) = self.editor.tool_state.get_drag_rect() {
             if w > 10.0 && h > 10.0 {
                 if let Some(ref pixbuf) = self.final_image.clone() {
@@ -146,23 +151,27 @@ impl AppState {
     }
 
     pub fn exit_capture_mode(&mut self) {
+        debug!("Exiting capture mode");
         self.is_active = false;
         self.selection = None;
         self.editor.reset();
     }
 
     pub fn exit_crop_mode(&mut self) {
+        debug!("Exiting crop mode");
         self.is_crop_mode = false;
         self.editor.tool_state.reset_drag();
     }
 
     pub fn increment_delay(&mut self) {
+        debug!("Incrementing delay");
         if self.delay_seconds < 10 {
             self.delay_seconds += 1;
         }
     }
 
     pub fn decrement_delay(&mut self) {
+        debug!("Decrementing delay");
         if self.delay_seconds > 0 {
             self.delay_seconds -= 1;
         }

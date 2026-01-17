@@ -11,6 +11,7 @@ pub use color_picker::{pick_color_from_pixbuf, ColorPickerState};
 pub use tools::{EditorTool, ToolState};
 
 use gtk4::gdk::RGBA;
+use log::debug;
 
 #[derive(Clone, Debug)]
 pub struct EditorState {
@@ -56,6 +57,7 @@ impl EditorState {
     }
 
     pub fn set_tool(&mut self, tool: EditorTool) {
+        debug!("Setting tool to {:?}", tool);
         self.tool_state.set_tool(tool);
         self.pending_text = None;
     }
@@ -65,6 +67,7 @@ impl EditorState {
     }
 
     pub fn set_color(&mut self, color: RGBA) {
+        debug!("Setting color to {:?}", color);
         self.tool_state.set_color(color);
     }
 
@@ -91,6 +94,7 @@ impl EditorState {
     }
 
     pub fn commit_text(&mut self, text: String) {
+        debug!("Committing text: {}", text);
         if let Some(pending) = self.pending_text.take() {
             if !text.is_empty() {
                 let text_annotation = TextAnnotation::new(
@@ -113,6 +117,7 @@ impl EditorState {
     }
 
     pub fn undo(&mut self) -> bool {
+        debug!("Undo operation requested");
         self.annotations.undo()
     }
 
@@ -130,6 +135,7 @@ impl EditorState {
     }
 
     pub fn reset(&mut self) {
+        debug!("Resetting editor state");
         self.annotations.clear();
         self.color_picker.clear();
         self.pending_text = None;
@@ -137,6 +143,7 @@ impl EditorState {
     }
 
     pub fn pointer_drag_start(&mut self, display_x: f64, display_y: f64) -> bool {
+        debug!("Pointer drag start at ({}, {})", display_x, display_y);
         self.last_drag_moved = false;
         let (img_x, img_y) = self.display_to_image_coords(display_x, display_y);
 
@@ -176,6 +183,7 @@ impl EditorState {
     }
 
     pub fn pointer_drag_end(&mut self) {
+        debug!("Pointer drag end");
         self.last_drag_moved = self.tool_state.moved_annotation;
         self.tool_state.end_annotation_drag();
     }

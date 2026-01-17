@@ -1,4 +1,5 @@
 use gtk4::gdk_pixbuf::Pixbuf;
+use log::{debug, info};
 
 use super::desktop::DesktopSession;
 use super::window_backends;
@@ -97,26 +98,32 @@ impl std::error::Error for WindowCaptureError {}
 
 pub fn list_capturable_windows() -> Result<Vec<WindowInfo>, WindowCaptureError> {
     let session = DesktopSession::detect();
-    println!(
+    info!(
         "Detected session: {} (using {} backend)",
         session,
         session.window_list_backend()
     );
 
     let windows = window_backends::list_windows_for_session(&session)?;
+    debug!("Found {} windows in total", windows.len());
 
     let capturable: Vec<WindowInfo> = windows.into_iter().filter(|w| !w.is_minimized).collect();
+    debug!(
+        "{} windows are capturable (not minimized)",
+        capturable.len()
+    );
 
     Ok(capturable)
 }
 
 pub fn capture_window(window_info: &WindowInfo) -> Result<WindowCaptureResult, WindowCaptureError> {
     let session = DesktopSession::detect();
-    println!(
+    info!(
         "Capturing window '{}' using {} backend",
         window_info.display_label(),
         session.window_list_backend()
     );
+    debug!("Window details: {:?}", window_info);
 
     window_backends::capture_window_for_session(&session, window_info)
 }

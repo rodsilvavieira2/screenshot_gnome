@@ -12,6 +12,7 @@ mod ui;
 const APP_ID: &str = "org.example.ScreenshotGnome";
 
 fn main() {
+    env_logger::init();
     let args: Vec<String> = std::env::args().collect();
 
     let start_mode =

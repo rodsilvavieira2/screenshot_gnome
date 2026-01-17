@@ -1,4 +1,5 @@
 use gtk4 as gtk;
+use log::{debug, info};
 use std::process::Command;
 use xcap::Monitor;
 
@@ -32,6 +33,7 @@ pub struct CaptureResult {
 /// Capture the primary monitor, using the appropriate backend for the current session
 pub fn capture_primary_monitor() -> Result<CaptureResult, String> {
     let session = DesktopSession::detect();
+    info!("Capturing primary monitor on {}", session.display_server);
 
     match session.display_server {
         DisplayServer::Wayland => capture_screen_wayland(&session),
@@ -45,6 +47,7 @@ pub fn capture_primary_monitor() -> Result<CaptureResult, String> {
 
 /// Capture screen using xcap (works on X11)
 fn capture_screen_xcap() -> Result<CaptureResult, String> {
+    debug!("Using xcap backend for screen capture");
     let monitors = Monitor::all().map_err(|e| format!("Failed to get monitors: {}", e))?;
 
     let monitor = monitors
@@ -58,6 +61,10 @@ fn capture_screen_xcap() -> Result<CaptureResult, String> {
 
 /// Capture screen on Wayland using compositor-specific tools
 fn capture_screen_wayland(session: &DesktopSession) -> Result<CaptureResult, String> {
+    debug!(
+        "Using Wayland backend for screen capture ({})",
+        session.desktop_environment
+    );
     let temp_path = format!("/tmp/screenshot_gnome_screen_{}.png", std::process::id());
 
     let result = match &session.desktop_environment {
@@ -86,6 +93,7 @@ fn capture_screen_wayland(session: &DesktopSession) -> Result<CaptureResult, Str
 
 /// Capture using grim (wlroots-based compositors: Hyprland, Sway, etc.)
 fn capture_with_grim(temp_path: &str) -> Result<CaptureResult, String> {
+    debug!("Capturing with grim to {}", temp_path);
     let output = Command::new("grim")
         .arg(temp_path)
         .output()
@@ -109,6 +117,7 @@ fn capture_with_grim(temp_path: &str) -> Result<CaptureResult, String> {
 
 /// Capture using gnome-screenshot (GNOME)
 fn capture_with_gnome_screenshot(temp_path: &str) -> Result<CaptureResult, String> {
+    debug!("Capturing with gnome-screenshot to {}", temp_path);
     let output = Command::new("gnome-screenshot")
         .args(["-f", temp_path])
         .output()
@@ -137,6 +146,7 @@ fn capture_with_gnome_screenshot(temp_path: &str) -> Result<CaptureResult, Strin
 
 /// Capture using spectacle (KDE Plasma)
 fn capture_with_spectacle(temp_path: &str) -> Result<CaptureResult, String> {
+    debug!("Capturing with spectacle to {}", temp_path);
     let output = Command::new("spectacle")
         .args(["-b", "-n", "-f", "-o", temp_path])
         .output()

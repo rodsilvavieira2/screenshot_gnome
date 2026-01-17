@@ -1,3 +1,4 @@
+use log::debug;
 use std::env;
 use std::process::Command;
 
@@ -54,13 +55,16 @@ pub struct DesktopSession {
 
 impl DesktopSession {
     pub fn detect() -> Self {
+        debug!("Detecting desktop session...");
         let display_server = detect_display_server();
         let desktop_environment = detect_desktop_environment(&display_server);
 
-        Self {
+        let session = Self {
             display_server,
             desktop_environment,
-        }
+        };
+        debug!("Detected session: {}", session);
+        session
     }
 
     #[allow(dead_code)]
@@ -136,6 +140,7 @@ impl std::fmt::Display for WindowListBackend {
 
 fn detect_display_server() -> DisplayServer {
     if let Ok(session_type) = env::var("XDG_SESSION_TYPE") {
+        debug!("XDG_SESSION_TYPE={}", session_type);
         match session_type.to_lowercase().as_str() {
             "wayland" => return DisplayServer::Wayland,
             "x11" => return DisplayServer::X11,
@@ -155,15 +160,22 @@ fn detect_display_server() -> DisplayServer {
 }
 
 fn detect_desktop_environment(display_server: &DisplayServer) -> DesktopEnvironment {
+    debug!(
+        "Detecting desktop environment for display server: {}",
+        display_server
+    );
     if env::var("HYPRLAND_INSTANCE_SIGNATURE").is_ok() {
+        debug!("Detected Hyprland via HYPRLAND_INSTANCE_SIGNATURE");
         return DesktopEnvironment::Hyprland;
     }
 
     if env::var("SWAYSOCK").is_ok() {
+        debug!("Detected Sway via SWAYSOCK");
         return DesktopEnvironment::Sway;
     }
 
     if let Ok(current_desktop) = env::var("XDG_CURRENT_DESKTOP") {
+        debug!("XDG_CURRENT_DESKTOP={}", current_desktop);
         let desktop_lower = current_desktop.to_lowercase();
 
         for component in desktop_lower.split(':') {
@@ -199,6 +211,7 @@ fn detect_desktop_environment(display_server: &DisplayServer) -> DesktopEnvironm
     }
 
     if let Ok(desktop_session) = env::var("DESKTOP_SESSION") {
+        debug!("DESKTOP_SESSION={}", desktop_session);
         let session_lower = desktop_session.to_lowercase();
 
         if session_lower.contains("gnome") {
@@ -215,10 +228,12 @@ fn detect_desktop_environment(display_server: &DisplayServer) -> DesktopEnvironm
     }
 
     if env::var("KDE_FULL_SESSION").is_ok() {
+        debug!("KDE_FULL_SESSION is set");
         return DesktopEnvironment::Kde;
     }
 
     if env::var("GNOME_DESKTOP_SESSION_ID").is_ok() {
+        debug!("GNOME_DESKTOP_SESSION_ID is set");
         return DesktopEnvironment::Gnome;
     }
 
