@@ -3,7 +3,7 @@ use gtk4 as gtk;
 use libadwaita as adw;
 use log::{debug, error, info};
 
-use gtk::{GestureClick, GestureDrag};
+use gtk::{EventControllerKey, GestureClick, GestureDrag};
 use gtk4::prelude::*;
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -380,6 +380,26 @@ pub fn connect_click_handlers(state: &Rc<RefCell<AppState>>, components: &UiComp
     components.drawing.drawing_area.add_controller(click);
 }
 
+fn confirm_selection(
+    s: &mut AppState,
+    window: &adw::ApplicationWindow,
+    header_bar: &adw::HeaderBar,
+    tools_box: &gtk::Box,
+    crop_tools_box: &gtk::Box,
+) -> bool {
+    if s.is_active && s.mode == CaptureMode::Selection && s.apply_selection_crop() {
+        s.exit_capture_mode();
+
+        window.unfullscreen();
+        header_bar.set_visible(true);
+        tools_box.set_visible(true);
+        crop_tools_box.set_visible(false);
+        return true;
+    }
+
+    false
+}
+
 pub fn connect_crop_handlers(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
     components.crop_toolbar.confirm_btn.connect_clicked({
         let state = state.clone();
@@ -393,15 +413,7 @@ pub fn connect_crop_handlers(state: &Rc<RefCell<AppState>>, components: &UiCompo
         move |_| {
             let mut s = state.borrow_mut();
 
-            if s.is_active && s.mode == CaptureMode::Selection {
-                s.apply_selection_crop();
-                s.exit_capture_mode();
-
-                window.unfullscreen();
-                header_bar.set_visible(true);
-                tools_box.set_visible(true);
-                crop_tools_box.set_visible(false);
-
+            if confirm_selection(&mut s, &window, &header_bar, &tools_box, &crop_tools_box) {
                 drop(s);
                 drawing_area.queue_draw();
                 return;
@@ -504,6 +516,62 @@ pub fn connect_screenshot_handler(state: &Rc<RefCell<AppState>>, components: &Ui
     });
 }
 
+pub fn connect_keyboard_handlers(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
+    let key_controller = EventControllerKey::new();
+    key_controller.set_propagation_phase(gtk::PropagationPhase::Capture);
+
+    key_controller.connect_key_pressed({
+        let state = state.clone();
+        let drawing_area = components.drawing.drawing_area.clone();
+        let window = components.window.clone();
+        let header_bar = components.header.header_bar.clone();
+        let tools_box = components.toolbar.tools_box.clone();
+        let crop_tools_box = components.crop_toolbar.crop_tools_box.clone();
+        let placeholder_icon = components.drawing.placeholder_icon.clone();
+
+        move |_, key, _code, _modifier| {
+            let mut s = state.borrow_mut();
+
+            // Handle ESC key - Cancel selection
+            if key == gtk::gdk::Key::Escape && s.is_active && s.mode == CaptureMode::Selection {
+                debug!("ESC pressed - canceling selection");
+                s.is_active = false;
+                s.selection = None;
+
+                window.unfullscreen();
+                header_bar.set_visible(true);
+                tools_box.set_visible(s.final_image.is_some());
+                crop_tools_box.set_visible(false);
+
+                if s.final_image.is_none() {
+                    placeholder_icon.set_visible(true);
+                }
+
+                drop(s);
+                drawing_area.queue_draw();
+                return glib::Propagation::Stop;
+            }
+
+            // Handle Enter key (including keypad) - Confirm selection
+            if (key == gtk::gdk::Key::Return || key == gtk::gdk::Key::KP_Enter)
+                && s.is_active
+                && s.mode == CaptureMode::Selection
+            {
+                debug!("Enter pressed - confirming selection");
+                if confirm_selection(&mut s, &window, &header_bar, &tools_box, &crop_tools_box) {
+                    drop(s);
+                    drawing_area.queue_draw();
+                }
+                return glib::Propagation::Stop;
+            }
+
+            glib::Propagation::Proceed
+        }
+    });
+
+    components.window.add_controller(key_controller);
+}
+
 pub fn capture_screen_or_selection(
     state: &Rc<RefCell<AppState>>,
     window: &adw::ApplicationWindow,
@@ -548,6 +616,7 @@ pub fn capture_screen_or_selection(
 
                 window.set_visible(true);
                 window.fullscreen();
+                drawing_area.grab_focus();
                 drawing_area.queue_draw();
             }
         }
@@ -567,4 +636,5 @@ pub fn connect_all_handlers(state: &Rc<RefCell<AppState>>, components: &UiCompon
     connect_click_handlers(state, components);
     connect_crop_handlers(state, components);
     connect_screenshot_handler(state, components);
+    connect_keyboard_handlers(state, components);
 }

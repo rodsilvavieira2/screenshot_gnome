@@ -111,14 +111,21 @@ impl AppState {
         if let Some(sel) = self.selection {
             if sel.is_significant() {
                 if let Some(ref orig) = self.original_screenshot {
-                    let rect = sel.rectangle();
-                    let crop_x = rect.x().max(0);
-                    let crop_y = rect.y().max(0);
-                    let crop_w = rect.width().min(orig.width() - crop_x);
-                    let crop_h = rect.height().min(orig.height() - crop_y);
+                    let (start_x, start_y) = self
+                        .editor
+                        .display_to_image_coords(sel.start_x, sel.start_y);
+                    let (end_x, end_y) = self.editor.display_to_image_coords(sel.end_x, sel.end_y);
+
+                    let x = start_x.min(end_x).max(0.0) as i32;
+                    let y = start_y.min(end_y).max(0.0) as i32;
+                    let w = (start_x - end_x).abs() as i32;
+                    let h = (start_y - end_y).abs() as i32;
+
+                    let crop_w = w.min(orig.width() - x);
+                    let crop_h = h.min(orig.height() - y);
 
                     if crop_w > 0 && crop_h > 0 {
-                        let cropped = orig.new_subpixbuf(crop_x, crop_y, crop_w, crop_h);
+                        let cropped = orig.new_subpixbuf(x, y, crop_w, crop_h);
                         self.final_image = Some(cropped);
                         return true;
                     }

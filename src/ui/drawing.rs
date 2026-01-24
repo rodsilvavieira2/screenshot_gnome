@@ -14,7 +14,11 @@ pub struct DrawingComponents {
 }
 
 pub fn create_drawing_area(state: &Rc<RefCell<AppState>>) -> DrawingComponents {
-    let drawing_area = DrawingArea::builder().hexpand(true).vexpand(true).build();
+    let drawing_area = DrawingArea::builder()
+        .hexpand(true)
+        .vexpand(true)
+        .focusable(true)
+        .build();
 
     setup_draw_function(&drawing_area, state);
 
