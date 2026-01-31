@@ -33,6 +33,13 @@ pub struct CropToolbarComponents {
     pub cancel_btn: gtk::Button,
 }
 
+#[derive(Clone)]
+pub struct SelectionToolbarComponents {
+    pub selection_tools_box: gtk::Box,
+    pub confirm_btn: gtk::Button,
+    pub cancel_btn: gtk::Button,
+}
+
 pub fn create_toolbar(state: &Rc<RefCell<AppState>>) -> ToolbarComponents {
     let color_button = gtk::ColorDialogButton::builder()
         .dialog(&gtk::ColorDialog::new())
@@ -179,6 +186,40 @@ pub fn create_crop_toolbar() -> CropToolbarComponents {
 
     CropToolbarComponents {
         crop_tools_box,
+        confirm_btn,
+        cancel_btn,
+    }
+}
+
+pub fn create_selection_toolbar() -> SelectionToolbarComponents {
+    let selection_tools_box = gtk::Box::builder()
+        .orientation(Orientation::Horizontal)
+        .spacing(12)
+        .halign(Align::Center)
+        .valign(Align::End)
+        .margin_bottom(24)
+        .visible(false)
+        .build();
+    selection_tools_box.add_css_class("osd");
+    selection_tools_box.add_css_class("toolbar");
+
+    let cancel_btn = gtk::Button::builder()
+        .icon_name("process-stop-symbolic")
+        .tooltip_text("Cancel")
+        .build();
+    cancel_btn.add_css_class("destructive-action");
+
+    let confirm_btn = gtk::Button::builder()
+        .icon_name("object-select-symbolic")
+        .tooltip_text("Confirm")
+        .build();
+    confirm_btn.add_css_class("suggested-action");
+
+    selection_tools_box.append(&cancel_btn);
+    selection_tools_box.append(&confirm_btn);
+
+    SelectionToolbarComponents {
+        selection_tools_box,
         confirm_btn,
         cancel_btn,
     }

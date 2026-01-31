@@ -23,6 +23,7 @@ pub fn build_ui(app: &adw::Application, start_mode: Option<CaptureMode>) {
     let header = header::create_header_bar(&state);
     let toolbar = toolbar::create_toolbar(&state);
     let crop_toolbar = toolbar::create_crop_toolbar();
+    let selection_toolbar = toolbar::create_selection_toolbar();
     let drawing = drawing::create_drawing_area(&state);
     let text_popover = dialogs::create_text_popover(&drawing.drawing_area);
 
@@ -41,6 +42,7 @@ pub fn build_ui(app: &adw::Application, start_mode: Option<CaptureMode>) {
     overlay.add_overlay(&drawing.placeholder_icon);
     overlay.add_overlay(&toolbar.tools_box);
     overlay.add_overlay(&crop_toolbar.crop_tools_box);
+    overlay.add_overlay(&selection_toolbar.selection_tools_box);
     overlay.add_overlay(&drawing.picked_color_label);
 
     let content = gtk::Box::builder()
@@ -62,6 +64,7 @@ pub fn build_ui(app: &adw::Application, start_mode: Option<CaptureMode>) {
         header,
         toolbar,
         crop_toolbar,
+        selection_toolbar,
         drawing,
         text_popover,
     };
@@ -81,6 +84,7 @@ pub fn build_ui(app: &adw::Application, start_mode: Option<CaptureMode>) {
                     &components.header.header_bar,
                     &components.toolbar.tools_box,
                     &components.crop_toolbar.crop_tools_box,
+                    &components.selection_toolbar.selection_tools_box,
                     &components.drawing.drawing_area,
                     &components.drawing.placeholder_icon,
                     mode,

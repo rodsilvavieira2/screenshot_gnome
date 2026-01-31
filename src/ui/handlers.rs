@@ -23,7 +23,7 @@ use crate::ui::dialogs::{show_window_selector, TextPopoverComponents};
 use crate::ui::drawing::DrawingComponents;
 use crate::ui::header::HeaderComponents;
 use crate::ui::shortcuts;
-use crate::ui::toolbar::{CropToolbarComponents, ToolbarComponents};
+use crate::ui::toolbar::{CropToolbarComponents, SelectionToolbarComponents, ToolbarComponents};
 
 #[derive(Clone)]
 pub struct UiComponents {
@@ -31,6 +31,7 @@ pub struct UiComponents {
     pub header: HeaderComponents,
     pub toolbar: ToolbarComponents,
     pub crop_toolbar: CropToolbarComponents,
+    pub selection_toolbar: SelectionToolbarComponents,
     pub drawing: DrawingComponents,
     pub text_popover: TextPopoverComponents,
 }
@@ -357,6 +358,57 @@ pub fn connect_crop_handlers(state: &Rc<RefCell<AppState>>, components: &UiCompo
     });
 }
 
+pub fn connect_selection_handlers(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
+    components.selection_toolbar.confirm_btn.connect_clicked({
+        let state = state.clone();
+        let window = components.window.clone();
+        let header_bar = components.header.header_bar.clone();
+        let tools_box = components.toolbar.tools_box.clone();
+        let crop_tools_box = components.crop_toolbar.crop_tools_box.clone();
+        let selection_tools_box = components.selection_toolbar.selection_tools_box.clone();
+        let drawing_area = components.drawing.drawing_area.clone();
+        move |_| {
+            let mut s = state.borrow_mut();
+            if confirm_selection(
+                &mut s,
+                &window,
+                &header_bar,
+                &tools_box,
+                &crop_tools_box,
+            ) {
+                selection_tools_box.set_visible(false);
+                drop(s);
+                drawing_area.queue_draw();
+            }
+        }
+    });
+
+    components.selection_toolbar.cancel_btn.connect_clicked({
+        let state = state.clone();
+        let window = components.window.clone();
+        let header_bar = components.header.header_bar.clone();
+        let tools_box = components.toolbar.tools_box.clone();
+        let crop_tools_box = components.crop_toolbar.crop_tools_box.clone();
+        let selection_tools_box = components.selection_toolbar.selection_tools_box.clone();
+        let placeholder_icon = components.drawing.placeholder_icon.clone();
+        let drawing_area = components.drawing.drawing_area.clone();
+        move |_| {
+            let mut s = state.borrow_mut();
+            s.exit_capture_mode();
+            window.unfullscreen();
+            header_bar.set_visible(true);
+            tools_box.set_visible(s.final_image.is_some());
+            crop_tools_box.set_visible(false);
+            selection_tools_box.set_visible(false);
+            if s.final_image.is_none() {
+                placeholder_icon.set_visible(true);
+            }
+            drop(s);
+            drawing_area.queue_draw();
+        }
+    });
+}
+
 pub fn connect_screenshot_handler(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
     components.header.take_screenshot_btn.connect_clicked({
         let state = state.clone();
@@ -364,6 +416,7 @@ pub fn connect_screenshot_handler(state: &Rc<RefCell<AppState>>, components: &Ui
         let header_bar = components.header.header_bar.clone();
         let tools_box = components.toolbar.tools_box.clone();
         let crop_tools_box = components.crop_toolbar.crop_tools_box.clone();
+        let selection_tools_box = components.selection_toolbar.selection_tools_box.clone();
         let drawing_area = components.drawing.drawing_area.clone();
         let placeholder_icon = components.drawing.placeholder_icon.clone();
         move |_| {
@@ -374,6 +427,7 @@ pub fn connect_screenshot_handler(state: &Rc<RefCell<AppState>>, components: &Ui
                 &header_bar,
                 &tools_box,
                 &crop_tools_box,
+                &selection_tools_box,
                 &drawing_area,
                 &placeholder_icon,
                 mode,
@@ -393,6 +447,7 @@ pub fn connect_keyboard_handlers(state: &Rc<RefCell<AppState>>, components: &UiC
         let header_bar = components.header.header_bar.clone();
         let tools_box = components.toolbar.tools_box.clone();
         let crop_tools_box = components.crop_toolbar.crop_tools_box.clone();
+        let selection_tools_box = components.selection_toolbar.selection_tools_box.clone();
         let placeholder_icon = components.drawing.placeholder_icon.clone();
         let mode_selection_btn = components.header.mode_selection_btn.clone();
         let mode_window_btn = components.header.mode_window_btn.clone();
@@ -428,6 +483,7 @@ pub fn connect_keyboard_handlers(state: &Rc<RefCell<AppState>>, components: &UiC
                             header_bar.set_visible(true);
                             tools_box.set_visible(s.final_image.is_some());
                             crop_tools_box.set_visible(false);
+                            selection_tools_box.set_visible(false);
                             if s.final_image.is_none() {
                                 placeholder_icon.set_visible(true);
                             }
@@ -453,6 +509,7 @@ pub fn connect_keyboard_handlers(state: &Rc<RefCell<AppState>>, components: &UiC
                                 &tools_box,
                                 &crop_tools_box,
                             ) {
+                                selection_tools_box.set_visible(false);
                                 drop(s);
                                 drawing_area.queue_draw();
                             }
@@ -532,6 +589,7 @@ pub fn capture_screen_or_selection(
     header_bar: &adw::HeaderBar,
     tools_box: &gtk::Box,
     crop_tools_box: &gtk::Box,
+    selection_tools_box: &gtk::Box,
     drawing_area: &gtk::DrawingArea,
     placeholder_icon: &gtk::Image,
     mode: CaptureMode,
@@ -571,6 +629,7 @@ pub fn capture_screen_or_selection(
                 header_bar.set_visible(false);
                 tools_box.set_visible(false);
                 crop_tools_box.set_visible(false);
+                selection_tools_box.set_visible(true);
                 placeholder_icon.set_visible(false);
             }
             drop(s);
@@ -590,6 +649,7 @@ pub fn connect_all_handlers(state: &Rc<RefCell<AppState>>, components: &UiCompon
     connect_drag_handlers(state, components);
     connect_click_handlers(state, components);
     connect_crop_handlers(state, components);
+    connect_selection_handlers(state, components);
     connect_screenshot_handler(state, components);
     connect_keyboard_handlers(state, components);
 
