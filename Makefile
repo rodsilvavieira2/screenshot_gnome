@@ -33,11 +33,11 @@ BINARY_PATH = $(TARGET_DIR)/$(BINARY_NAME)
 ICON_SIZES = 48x48 64x64 128x128 256x256
 
 # Colors for output
-COLOR_RESET = \033[0m
-COLOR_BOLD = \033[1m
-COLOR_GREEN = \033[32m
-COLOR_YELLOW = \033[33m
-COLOR_BLUE = \033[34m
+COLOR_RESET  := $(shell printf '\033[0m')
+COLOR_BOLD   := $(shell printf '\033[1m')
+COLOR_GREEN  := $(shell printf '\033[32m')
+COLOR_YELLOW := $(shell printf '\033[33m')
+COLOR_BLUE   := $(shell printf '\033[34m')
 
 .PHONY: all build clean install uninstall install-user uninstall-user help
 
