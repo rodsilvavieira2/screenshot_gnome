@@ -56,7 +56,7 @@ sudo pacman -S rust gtk4 libadwaita
 Clone the repository and build the release binary:
 
 ```bash
-git clone https://github.com/yourusername/screenshot_gnome.git
+git clone https://github.com/rodsilvavieira2/screenshot_gnome.git
 cd screenshot_gnome
 make build
 ```
@@ -270,8 +270,8 @@ Built with:
 
 ## Support
 
-- **Issues**: https://github.com/yourusername/screenshot_gnome/issues
-- **Discussions**: https://github.com/yourusername/screenshot_gnome/discussions
+- **Issues**: https://github.com/rodsilvavieira2/screenshot_gnome/issues
+- **Discussions**: https://github.com/rodsilvavieira2/screenshot_gnome/discussions
 
 ## Flatpak/Flathub
 

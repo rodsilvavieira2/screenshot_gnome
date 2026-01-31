@@ -34,8 +34,8 @@
     </screenshot>
   </screenshots>
   
-  <url type="homepage">https://github.com/yourusername/screenshot_gnome</url>
-  <url type="bugtracker">https://github.com/yourusername/screenshot_gnome/issues</url>
+  <url type="homepage">https://github.com/rodsilvavieira2/screenshot_gnome</url>
+  <url type="bugtracker">https://github.com/rodsilvavieira2/screenshot_gnome/issues</url>
   
   <provides>
     <binary>screenshot_gnome</binary>

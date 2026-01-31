@@ -1,4 +1,5 @@
 use gtk4 as gtk;
+use libadwaita as adw;
 use log::{debug, error, info};
 
 use gtk::{Align, Orientation};
@@ -241,4 +242,20 @@ pub fn show_window_selector(
     });
 
     window_selector.present();
+}
+
+pub fn show_about_dialog(parent_window: &impl IsA<gtk::Window>) {
+    let about = adw::AboutWindow::builder()
+        .transient_for(parent_window)
+        .application_name("Screenshot Tool")
+        .application_icon("screenshot_gnome")
+        .developer_name("screenshot_gnome developers")
+        .version("0.1.0")
+        .license_type(gtk::License::MitX11)
+        .website("https://github.com/rodsilvavieira2/screenshot_gnome")
+        .issue_url("https://github.com/rodsilvavieira2/screenshot_gnome/issues")
+        .copyright("© 2024 screenshot_gnome developers")
+        .build();
+
+    about.present();
 }

@@ -18,7 +18,7 @@ use crate::editor::{
     pick_color_from_pixbuf, Annotation, ClipboardManager, EditorTool, FreeDrawAnnotation,
     RectangleAnnotation,
 };
-use crate::ui::dialogs::{show_window_selector, TextPopoverComponents};
+use crate::ui::dialogs::{show_about_dialog, show_window_selector, TextPopoverComponents};
 use crate::ui::drawing::DrawingComponents;
 use crate::ui::header::HeaderComponents;
 use crate::ui::shortcuts;
@@ -679,7 +679,17 @@ pub fn connect_all_handlers(state: &Rc<RefCell<AppState>>, components: &UiCompon
     });
     components.window.add_action(&action_shortcuts);
 
+    let action_about = gio::SimpleAction::new("about", None);
+    action_about.connect_activate({
+        let window = components.window.clone();
+        move |_, _| {
+            show_about_dialog(&window);
+        }
+    });
+    components.window.add_action(&action_about);
+
     let menu_model = gio::Menu::new();
     menu_model.append(Some("Keyboard Shortcuts"), Some("win.shortcuts"));
+    menu_model.append(Some("About Screenshot Tool"), Some("win.about"));
     components.header.menu_btn.set_menu_model(Some(&menu_model));
 }

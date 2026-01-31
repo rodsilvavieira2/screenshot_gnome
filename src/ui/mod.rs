@@ -53,7 +53,7 @@ pub fn build_ui(app: &adw::Application, start_mode: Option<CaptureMode>) {
 
     let window = adw::ApplicationWindow::builder()
         .application(app)
-        .title("GNOME Snapper")
+        .title("Screenshot Tool")
         .content(&content)
         .default_width(900)
         .default_height(600)
