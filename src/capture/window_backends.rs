@@ -85,7 +85,7 @@ fn parse_hyprland_json(json_str: &str) -> WindowListResult {
     let mut in_string = false;
     let mut escape_next = false;
 
-    for (i, c) in content.chars().enumerate() {
+    for (i, c) in content.char_indices() {
         if escape_next {
             escape_next = false;
             continue;
@@ -118,7 +118,7 @@ fn parse_hyprland_json(json_str: &str) -> WindowListResult {
 
 fn parse_hyprland_client_object(obj_str: &str) -> Option<WindowInfo> {
     let address = extract_json_hex_value(obj_str, "address")?;
-    let id = u32::from_str_radix(&address.trim_start_matches("0x"), 16).unwrap_or(0);
+    let id = u32::from_str_radix(address.trim_start_matches("0x"), 16).unwrap_or(0);
 
     let pid = extract_json_number(obj_str, "pid").unwrap_or(0);
     let title = extract_json_string(obj_str, "title").unwrap_or_default();
@@ -580,11 +580,7 @@ fn extract_gvariant_number(text: &str) -> Option<u32> {
     let start = text.find("'pid':")? + 6;
     let rest = text[start..].trim_start();
 
-    let number_part = if rest.starts_with('<') {
-        &rest[1..]
-    } else {
-        rest
-    };
+    let number_part = rest.strip_prefix('<').unwrap_or(rest);
 
     let number_str = number_part
         .split_whitespace()

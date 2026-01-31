@@ -17,6 +17,7 @@ pub enum Action {
     SwitchToSelection,
     SwitchToWindow,
     SwitchToScreen,
+    TakeScreenshot,
 }
 
 impl Action {
@@ -36,6 +37,7 @@ impl Action {
             Action::SwitchToSelection => "Switch to Selection Mode",
             Action::SwitchToWindow => "Switch to Window Mode",
             Action::SwitchToScreen => "Switch to Screen Mode",
+            Action::TakeScreenshot => "Take Screenshot",
         }
     }
 }
@@ -149,6 +151,15 @@ impl Default for ShortcutConfig {
             Shortcut {
                 key: gdk::Key::d,
                 modifiers: gdk::ModifierType::ALT_MASK,
+            },
+        );
+
+        // Take Screenshot
+        bindings.insert(
+            Action::TakeScreenshot,
+            Shortcut {
+                key: gdk::Key::p,
+                modifiers: gdk::ModifierType::CONTROL_MASK,
             },
         );
 

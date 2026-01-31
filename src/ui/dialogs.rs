@@ -147,7 +147,7 @@ pub fn show_window_selector(
 
     let session = DesktopSession::detect();
     let session_label = gtk::Label::builder()
-        .label(&format!(
+        .label(format!(
             "Session: {} • Backend: {}",
             session,
             session.window_list_backend()
@@ -176,7 +176,7 @@ pub fn show_window_selector(
                 .build();
 
             let label = gtk::Label::builder()
-                .label(&win_info.display_label())
+                .label(win_info.display_label())
                 .halign(Align::Start)
                 .ellipsize(gtk::pango::EllipsizeMode::End)
                 .build();
@@ -221,7 +221,7 @@ pub fn show_window_selector(
                             let error_dialog = gtk::AlertDialog::builder()
                                 .modal(true)
                                 .message("Failed to Capture Window")
-                                .detail(&format!(
+                                .detail(format!(
                                     "Could not capture the selected window.\n\nError: {}\n\n\
                                     Tip: Make sure the required screenshot tool is installed:\n\
                                     • Hyprland/Sway: grim\n\

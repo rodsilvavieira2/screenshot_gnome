@@ -25,6 +25,12 @@ pub fn show_shortcuts_dialog(state: &Rc<RefCell<AppState>>, parent: &impl IsA<gt
     add_action_row(state, &group_general, Action::Undo, "Undo");
     add_action_row(state, &group_general, Action::Cancel, "Cancel / Exit");
     add_action_row(state, &group_general, Action::Confirm, "Confirm Selection");
+    add_action_row(
+        state,
+        &group_general,
+        Action::TakeScreenshot,
+        "Take Screenshot",
+    );
     page.add(&group_general);
 
     let group_tools = adw::PreferencesGroup::builder().title("Tools").build();

@@ -7,7 +7,6 @@ use gtk::gio;
 use gtk::prelude::*;
 use gtk::{EventControllerKey, GestureClick, GestureDrag};
 use std::cell::RefCell;
-use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -58,28 +57,25 @@ fn perform_undo(state: &Rc<RefCell<AppState>>, drawing_area: &gtk::DrawingArea) 
 fn perform_save(state: Rc<RefCell<AppState>>, window: impl IsA<gtk::Window> + Clone + 'static) {
     glib::spawn_future_local(async move {
         let dialog = gtk::FileDialog::new();
-        match dialog.select_folder_future(Some(&window)).await {
-            Ok(folder) => {
-                if let Some(folder_path) = folder.path() {
-                    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH);
-                    let value_in_secs_timestamp = match timestamp {
-                        Ok(dur) => dur.as_secs(),
-                        Err(_) => 0,
-                    };
+        if let Ok(folder) = dialog.select_folder_future(Some(&window)).await {
+            if let Some(folder_path) = folder.path() {
+                let timestamp = SystemTime::now().duration_since(UNIX_EPOCH);
+                let value_in_secs_timestamp = match timestamp {
+                    Ok(dur) => dur.as_secs(),
+                    Err(_) => 0,
+                };
 
-                    let mut path = PathBuf::from(folder_path);
-                    path.push(format!("screenshot_{}.png", value_in_secs_timestamp));
-                    let s = state.borrow();
-                    if let Some(ref pixbuf) = s.final_image {
-                        if let Err(e) = pixbuf.savev(path.to_str().unwrap(), "png", &[]) {
-                            error!("Failed to save image: {}", e);
-                        } else {
-                            info!("Image saved to {:?}", path);
-                        }
+                let mut path = folder_path;
+                path.push(format!("screenshot_{}.png", value_in_secs_timestamp));
+                let s = state.borrow();
+                if let Some(ref pixbuf) = s.final_image {
+                    if let Err(e) = pixbuf.savev(path.to_str().unwrap(), "png", &[]) {
+                        error!("Failed to save image: {}", e);
+                    } else {
+                        info!("Image saved to {:?}", path);
                     }
                 }
             }
-            Err(_) => {}
         }
     });
 }
@@ -252,19 +248,16 @@ fn handle_drag_end(
                 let (img_start_x, img_start_y) = s.editor.display_to_image_coords(start.0, start.1);
                 let (img_end_x, img_end_y) = s.editor.display_to_image_coords(end.0, end.1);
 
-                match tool {
-                    EditorTool::Rectangle => {
-                        let rect = RectangleAnnotation::new(
-                            img_start_x,
-                            img_start_y,
-                            img_end_x,
-                            img_end_y,
-                            color,
-                            3.0,
-                        );
-                        s.editor.annotations.add(Annotation::Rectangle(rect));
-                    }
-                    _ => {}
+                if tool == EditorTool::Rectangle {
+                    let rect = RectangleAnnotation::new(
+                        img_start_x,
+                        img_start_y,
+                        img_end_x,
+                        img_end_y,
+                        color,
+                        3.0,
+                    );
+                    s.editor.annotations.add(Annotation::Rectangle(rect));
                 }
             }
         }
@@ -572,6 +565,21 @@ pub fn connect_keyboard_handlers(state: &Rc<RefCell<AppState>>, components: &UiC
                         let mut s = state.borrow_mut();
                         s.mode = CaptureMode::Screen;
                         mode_screen_btn.set_active(true);
+                        return glib::Propagation::Stop;
+                    }
+                    Action::TakeScreenshot => {
+                        let mode = state.borrow().mode;
+                        capture_screen_or_selection(
+                            &state,
+                            &window,
+                            &header_bar,
+                            &tools_box,
+                            &crop_tools_box,
+                            &selection_tools_box,
+                            &drawing_area,
+                            &placeholder_icon,
+                            mode,
+                        );
                         return glib::Propagation::Stop;
                     }
                 }
