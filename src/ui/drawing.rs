@@ -108,6 +108,12 @@ fn draw_content(state: &Rc<RefCell<AppState>>, cr: &gtk::cairo::Context, width: 
             draw_crop_overlay(&state, cr, da_width, da_height, scale);
         }
 
+        if state.editor.current_tool() == crate::editor::EditorTool::Rectangle
+            && state.editor.tool_state.is_drawing
+        {
+            draw_rectangle_preview(&state, cr, scale);
+        }
+
         if !state.is_active {
             state.editor.draw_annotations(cr);
         }
@@ -172,6 +178,25 @@ fn draw_crop_overlay(
 
         cr.set_source_rgb(1.0, 1.0, 1.0);
         cr.set_line_width(2.0);
+        cr.rectangle(dx, dy, dw, dh);
+        let _ = cr.stroke();
+    }
+}
+
+fn draw_rectangle_preview(state: &AppState, cr: &gtk::cairo::Context, scale: f64) {
+    if let Some((x, y, w, h)) = state.editor.tool_state.get_drag_rect() {
+        let (dx, dy) = state.editor.image_to_display_coords(x, y);
+        let dw = w * scale;
+        let dh = h * scale;
+
+        let color = state.editor.tool_state.color;
+        cr.set_source_rgba(
+            color.red() as f64,
+            color.green() as f64,
+            color.blue() as f64,
+            color.alpha() as f64,
+        );
+        cr.set_line_width(3.0);
         cr.rectangle(dx, dy, dw, dh);
         let _ = cr.stroke();
     }

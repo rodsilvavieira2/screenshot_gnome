@@ -158,10 +158,11 @@ fn handle_drag_begin(
             return;
         }
 
+        let (img_x, img_y) = s.editor.display_to_image_coords(start_x, start_y);
+
         match s.editor.current_tool() {
             EditorTool::Pencil => {
-                s.editor.tool_state.start_drag(start_x, start_y);
-                let (img_x, img_y) = s.editor.display_to_image_coords(start_x, start_y);
+                s.editor.tool_state.start_drag(img_x, img_y);
                 let mut free_draw = FreeDrawAnnotation::new(
                     s.editor.tool_state.color,
                     s.editor.tool_state.line_width,
@@ -171,8 +172,13 @@ fn handle_drag_begin(
                     .annotations
                     .set_current(Some(Annotation::FreeDraw(free_draw)));
             }
-            EditorTool::Rectangle | EditorTool::Crop => {
-                s.editor.tool_state.start_drag(start_x, start_y);
+            EditorTool::Rectangle => {
+                s.editor.tool_state.start_drag(img_x, img_y);
+            }
+            EditorTool::Crop => {
+                // For crop, reset any existing selection when starting a new one
+                s.editor.tool_state.reset_drag();
+                s.editor.tool_state.start_drag(img_x, img_y);
             }
             _ => {}
         }
@@ -197,13 +203,14 @@ fn handle_drag_update(
     if s.is_active && s.mode == CaptureMode::Selection {
         s.update_selection(current_x, current_y);
     } else if s.final_image.is_some() {
+        let (img_x, img_y) = s.editor.display_to_image_coords(current_x, current_y);
+
         if s.editor.tool_state.is_dragging_annotation {
             s.editor.pointer_drag_update(current_x, current_y);
         } else if s.editor.tool_state.is_drawing {
-            s.editor.tool_state.update_drag(current_x, current_y);
+            s.editor.tool_state.update_drag(img_x, img_y);
 
             if s.editor.current_tool() == EditorTool::Pencil {
-                let (img_x, img_y) = s.editor.display_to_image_coords(current_x, current_y);
                 if let Some(Annotation::FreeDraw(ref draw)) =
                     s.editor.annotations.current().cloned()
                 {
@@ -239,26 +246,27 @@ fn handle_drag_end(
             s.editor.pointer_drag_end();
         } else if s.editor.tool_state.is_drawing {
             let tool = s.editor.current_tool();
-            let drag_result = s.editor.tool_state.end_drag();
 
             if tool == EditorTool::Pencil {
+                s.editor.tool_state.end_drag();
                 s.editor.annotations.commit_current();
-            } else if let Some((start, end)) = drag_result {
-                let color = s.editor.tool_state.color;
-                let (img_start_x, img_start_y) = s.editor.display_to_image_coords(start.0, start.1);
-                let (img_end_x, img_end_y) = s.editor.display_to_image_coords(end.0, end.1);
-
-                if tool == EditorTool::Rectangle {
+            } else if tool == EditorTool::Rectangle {
+                let drag_result = s.editor.tool_state.end_drag();
+                if let Some((start, end)) = drag_result {
+                    let color = s.editor.tool_state.color;
                     let rect = RectangleAnnotation::new(
-                        img_start_x,
-                        img_start_y,
-                        img_end_x,
-                        img_end_y,
+                        start.0,
+                        start.1,
+                        (end.0 - start.0).abs(),
+                        (end.1 - start.1).abs(),
                         color,
                         3.0,
                     );
                     s.editor.annotations.add(Annotation::Rectangle(rect));
                 }
+            } else if tool == EditorTool::Crop {
+                // For crop, we keep the drag coordinates in ToolState but stop drawing
+                s.editor.tool_state.is_drawing = false;
             }
         }
     }
