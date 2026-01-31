@@ -589,11 +589,12 @@ pub fn capture_screen_or_selection(
     }
 
     window.set_visible(false);
+    let delay_seconds = state.borrow().delay_seconds;
     let context = gtk::glib::MainContext::default();
     while context.pending() {
         context.iteration(false);
     }
-    std::thread::sleep(Duration::from_millis(200));
+    std::thread::sleep(Duration::from_millis(200 + (delay_seconds as u64 * 1000)));
 
     match capture_primary_monitor() {
         Ok(result) => {
