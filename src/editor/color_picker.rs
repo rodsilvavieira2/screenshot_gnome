@@ -7,6 +7,7 @@ pub struct PickedColor {
 }
 
 impl PickedColor {
+    #[allow(dead_code)]
     pub fn to_hex(&self) -> String {
         format!(
             "#{:02X}{:02X}{:02X}",
@@ -82,6 +83,7 @@ impl ColorPickerState {
         Self::default()
     }
 
+    #[allow(dead_code)]
     pub fn set_picked_color(&mut self, color: PickedColor) {
         self.picked_color = Some(color);
     }

@@ -36,6 +36,7 @@ impl RectangleAnnotation {
         }
     }
 
+    #[allow(dead_code)]
     pub fn from_corners(x1: f64, y1: f64, x2: f64, y2: f64, color: RGBA, line_width: f64) -> Self {
         let x = x1.min(x2);
         let y = y1.min(y2);

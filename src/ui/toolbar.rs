@@ -8,6 +8,7 @@ use std::rc::Rc;
 use crate::app::AppState;
 use crate::editor::EditorTool;
 
+#[derive(Clone)]
 pub struct ToolbarComponents {
     pub tools_box: gtk::Box,
     pub tool_pointer_btn: gtk::ToggleButton,
@@ -16,13 +17,16 @@ pub struct ToolbarComponents {
     pub tool_crop_btn: gtk::ToggleButton,
     pub tool_text_btn: gtk::ToggleButton,
     pub tool_color_picker_btn: gtk::ToggleButton,
+    #[allow(dead_code)]
     pub color_button: gtk::ColorDialogButton,
+    #[allow(dead_code)]
     pub color_picker_circle: gtk::DrawingArea,
     pub undo_btn: gtk::Button,
     pub copy_btn: gtk::Button,
     pub save_btn: gtk::Button,
 }
 
+#[derive(Clone)]
 pub struct CropToolbarComponents {
     pub crop_tools_box: gtk::Box,
     pub confirm_btn: gtk::Button,

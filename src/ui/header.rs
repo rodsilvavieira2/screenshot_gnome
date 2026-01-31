@@ -8,9 +8,14 @@ use std::rc::Rc;
 
 use crate::app::{AppState, CaptureMode};
 
+#[derive(Clone)]
 pub struct HeaderComponents {
     pub header_bar: adw::HeaderBar,
     pub take_screenshot_btn: gtk::Button,
+    pub menu_btn: gtk::MenuButton,
+    pub mode_selection_btn: gtk::ToggleButton,
+    pub mode_window_btn: gtk::ToggleButton,
+    pub mode_screen_btn: gtk::ToggleButton,
 }
 
 pub fn create_header_bar(state: &Rc<RefCell<AppState>>) -> HeaderComponents {
@@ -94,6 +99,10 @@ pub fn create_header_bar(state: &Rc<RefCell<AppState>>) -> HeaderComponents {
     HeaderComponents {
         header_bar,
         take_screenshot_btn,
+        menu_btn,
+        mode_selection_btn: mode_selection,
+        mode_window_btn: mode_window,
+        mode_screen_btn: mode_screen,
     }
 }
 

@@ -2,6 +2,7 @@ pub mod dialogs;
 pub mod drawing;
 pub mod handlers;
 pub mod header;
+pub mod shortcuts;
 pub mod toolbar;
 
 use gtk4 as gtk;

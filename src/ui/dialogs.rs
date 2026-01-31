@@ -10,6 +10,7 @@ use crate::app::AppState;
 use crate::capture::desktop::DesktopSession;
 use crate::capture::window::{capture_window, list_capturable_windows, WindowInfo};
 
+#[derive(Clone)]
 pub struct TextPopoverComponents {
     pub text_popover: gtk::Popover,
     pub text_entry: gtk::Entry,

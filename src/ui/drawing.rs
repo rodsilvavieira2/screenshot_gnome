@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 use crate::app::{AppState, CaptureMode};
 
+#[derive(Clone)]
 pub struct DrawingComponents {
     pub drawing_area: DrawingArea,
     pub placeholder_icon: gtk::Image,

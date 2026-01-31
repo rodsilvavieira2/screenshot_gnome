@@ -1,6 +1,7 @@
 use gtk4 as gtk;
 use log::debug;
 
+use crate::app::config::ShortcutConfig;
 use crate::editor::EditorState;
 
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
@@ -70,6 +71,8 @@ pub struct AppState {
     pub is_crop_mode: bool,
 
     pub delay_seconds: u32,
+
+    pub shortcuts: ShortcutConfig,
 }
 
 impl Default for AppState {
@@ -92,6 +95,7 @@ impl AppState {
             editor: EditorState::new(),
             is_crop_mode: false,
             delay_seconds: 0,
+            shortcuts: ShortcutConfig::default(),
         }
     }
 
