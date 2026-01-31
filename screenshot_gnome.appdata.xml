@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2024 screenshot_gnome developers -->
+<component type="desktop-application">
+  <id>org.example.ScreenshotGnome</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Screenshot Tool</name>
+  <summary>Capture and edit screenshots with annotation tools</summary>
+  
+  <description>
+    <p>
+      Screenshot Tool is a modern screenshot utility for GNOME that allows you to 
+      capture, annotate, and share screenshots with ease.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Capture full screen, individual windows, or selected areas</li>
+      <li>Built-in image editor with annotation tools</li>
+      <li>Drawing tools: pen, rectangle, ellipse, arrow, and text</li>
+      <li>Color picker for custom annotations</li>
+      <li>Crop and resize captured images</li>
+      <li>Copy to clipboard or save to file</li>
+      <li>Modern GTK4/libadwaita interface following GNOME design guidelines</li>
+      <li>Keyboard shortcuts for quick capture</li>
+    </ul>
+  </description>
+  
+  <launchable type="desktop-id">screenshot_gnome.desktop</launchable>
+  
+  <screenshots>
+    <screenshot type="default">
+      <caption>Main application window</caption>
+      <!-- Add actual screenshot URLs when available -->
+    </screenshot>
+  </screenshots>
+  
+  <url type="homepage">https://github.com/yourusername/screenshot_gnome</url>
+  <url type="bugtracker">https://github.com/yourusername/screenshot_gnome/issues</url>
+  
+  <provides>
+    <binary>screenshot_gnome</binary>
+  </provides>
+  
+  <releases>
+    <release version="0.1.0" date="2024-01-31">
+      <description>
+        <p>Initial release</p>
+        <ul>
+          <li>Screen, window, and selection capture modes</li>
+          <li>Image editing with annotation tools</li>
+          <li>GTK4/libadwaita interface</li>
+          <li>Clipboard and file save support</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+  
+  <content_rating type="oars-1.1" />
+  
+  <developer_name>screenshot_gnome developers</developer_name>
+  <update_contact>your-email@example.com</update_contact>
+  
+  <categories>
+    <category>Graphics</category>
+    <category>Utility</category>
+  </categories>
+  
+  <keywords>
+    <keyword>screenshot</keyword>
+    <keyword>capture</keyword>
+    <keyword>screen</keyword>
+    <keyword>image</keyword>
+    <keyword>annotation</keyword>
+    <keyword>editor</keyword>
+  </keywords>
+</component>

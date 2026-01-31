@@ -1,0 +1,31 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Screenshot Tool
+GenericName=Screenshot Utility
+Comment=Capture and edit screenshots with annotation tools
+Icon=screenshot_gnome
+Exec=screenshot_gnome
+Terminal=false
+Categories=Graphics;GTK;GNOME;Utility;
+Keywords=screenshot;capture;screen;window;selection;image;print;snap;
+StartupNotify=true
+StartupWMClass=screenshot_gnome
+
+# Actions for different capture modes
+Actions=CaptureSelection;CaptureWindow;CaptureScreen;
+
+[Desktop Action CaptureSelection]
+Name=Capture Selection
+Exec=screenshot_gnome -s
+Icon=screenshot_gnome
+
+[Desktop Action CaptureWindow]
+Name=Capture Window
+Exec=screenshot_gnome -w
+Icon=screenshot_gnome
+
+[Desktop Action CaptureScreen]
+Name=Capture Screen
+Exec=screenshot_gnome --screen
+Icon=screenshot_gnome
