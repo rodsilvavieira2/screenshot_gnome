@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2024 rodsilvaviera2 -->
+<component type="desktop-application">
+  <id>io.github.rodsilvaviera2.ScreenshotGnome</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Screenshot Tool</name>
+  <summary>Capture and edit screenshots with annotation tools</summary>
+  
+  <developer id="io.github.rodsilvaviera2">
+    <name>rodsilvaviera2</name>
+  </developer>
+  
+  <description>
+    <p>
+      Screenshot Tool is a modern screenshot utility for GNOME that allows you to 
+      capture, annotate, and share screenshots with ease.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Capture full screen, individual windows, or selected areas</li>
+      <li>Built-in image editor with annotation tools</li>
+      <li>Drawing tools: pen, rectangle, ellipse, arrow, and text</li>
+      <li>Color picker for custom annotations</li>
+      <li>Crop and resize captured images</li>
+      <li>Copy to clipboard or save to file</li>
+      <li>Modern GTK4/libadwaita interface following GNOME design guidelines</li>
+      <li>Keyboard shortcuts for quick capture</li>
+    </ul>
+  </description>
+  
+  <launchable type="desktop-id">io.github.rodsilvaviera2.ScreenshotGnome.desktop</launchable>
+  
+  <screenshots>
+    <screenshot type="default">
+      <caption>Main application window with capture options</caption>
+      <!-- TODO: Replace with actual screenshot URL after taking screenshots -->
+      <!-- Recommended: Create screenshots/ directory in repo and add PNG files -->
+      <!-- Then use: https://raw.githubusercontent.com/rodsilvavieira2/screenshot_gnome/COMMIT_HASH/screenshots/main-window.png -->
+      <image>https://raw.githubusercontent.com/rodsilvavieira2/screenshot_gnome/main/icons/256x256/screenshot_gnome.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Screenshot editor with annotation tools</caption>
+      <!-- TODO: Replace with actual screenshot URL -->
+      <image>https://raw.githubusercontent.com/rodsilvavieira2/screenshot_gnome/main/icons/256x256/screenshot_gnome.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Area selection for capturing specific regions</caption>
+      <!-- TODO: Replace with actual screenshot URL -->
+      <image>https://raw.githubusercontent.com/rodsilvavieira2/screenshot_gnome/main/icons/256x256/screenshot_gnome.png</image>
+    </screenshot>
+  </screenshots>
+  
+  <url type="homepage">https://github.com/rodsilvavieira2/screenshot_gnome</url>
+  <url type="bugtracker">https://github.com/rodsilvavieira2/screenshot_gnome/issues</url>
+  <url type="vcs-browser">https://github.com/rodsilvavieira2/screenshot_gnome</url>
+  
+  <provides>
+    <binary>screenshot_gnome</binary>
+  </provides>
+  
+  <releases>
+    <release version="0.1.0" date="2024-01-31">
+      <description>
+        <p>Initial release of Screenshot Tool for GNOME</p>
+        <ul>
+          <li>Multiple capture modes: screen, window, and selection</li>
+          <li>Built-in image editor with annotation tools</li>
+          <li>Drawing tools: freehand, shapes, arrows, and text</li>
+          <li>Color picker for custom colors</li>
+          <li>Image operations: crop and resize</li>
+          <li>Copy to clipboard or save to file</li>
+          <li>Modern GTK4/libadwaita interface</li>
+          <li>Keyboard shortcuts support</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+  
+  <content_rating type="oars-1.1" />
+  
+  <update_contact>rodsilvavieira@gmail.com</update_contact>
+  
+  <categories>
+    <category>Graphics</category>
+    <category>Utility</category>
+  </categories>
+  
+  <keywords>
+    <keyword>screenshot</keyword>
+    <keyword>capture</keyword>
+    <keyword>screen</keyword>
+    <keyword>image</keyword>
+    <keyword>annotation</keyword>
+    <keyword>editor</keyword>
+  </keywords>
+  
+  <!-- Brand colors for Flathub website -->
+  <branding>
+    <color type="primary" scheme_preference="light">#3584e4</color>
+    <color type="primary" scheme_preference="dark">#1c71d8</color>
+  </branding>
+  
+  <!-- Device support: Desktop-only application -->
+  <requires>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <display_length compare="ge">768</display_length>
+  </requires>
+</component>

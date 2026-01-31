@@ -1,0 +1,53 @@
+{
+  "app-id": "io.github.rodsilvaviera2.ScreenshotGnome",
+  "runtime": "org.gnome.Platform",
+  "runtime-version": "47",
+  "sdk": "org.gnome.Sdk",
+  "sdk-extensions": [
+    "org.freedesktop.Sdk.Extension.rust-stable"
+  ],
+  "command": "screenshot_gnome",
+  "finish-args": [
+    "--share=ipc",
+    "--socket=fallback-x11",
+    "--socket=wayland",
+    "--device=dri",
+    "--filesystem=xdg-pictures/Screenshots:create",
+    "--filesystem=xdg-download:rw",
+    "--talk-name=org.freedesktop.portal.Screenshot",
+    "--talk-name=org.gnome.Shell.Screenshot"
+  ],
+  "build-options": {
+    "append-path": "/usr/lib/sdk/rust-stable/bin",
+    "env": {
+      "CARGO_HOME": "/run/build/screenshot_gnome/cargo"
+    }
+  },
+  "modules": [
+    {
+      "name": "screenshot_gnome",
+      "buildsystem": "simple",
+      "build-commands": [
+        "cargo --offline fetch --manifest-path Cargo.toml --verbose",
+        "cargo --offline build --release --verbose",
+        "install -Dm755 ./target/release/screenshot_gnome -t /app/bin/",
+        "install -Dm644 io.github.rodsilvaviera2.ScreenshotGnome.desktop /app/share/applications/io.github.rodsilvaviera2.ScreenshotGnome.desktop",
+        "install -Dm644 io.github.rodsilvaviera2.ScreenshotGnome.metainfo.xml /app/share/metainfo/io.github.rodsilvaviera2.ScreenshotGnome.metainfo.xml",
+        "install -Dm644 icons/48x48/screenshot_gnome.png /app/share/icons/hicolor/48x48/apps/io.github.rodsilvaviera2.ScreenshotGnome.png",
+        "install -Dm644 icons/64x64/screenshot_gnome.png /app/share/icons/hicolor/64x64/apps/io.github.rodsilvaviera2.ScreenshotGnome.png",
+        "install -Dm644 icons/128x128/screenshot_gnome.png /app/share/icons/hicolor/128x128/apps/io.github.rodsilvaviera2.ScreenshotGnome.png",
+        "install -Dm644 icons/256x256/screenshot_gnome.png /app/share/icons/hicolor/256x256/apps/io.github.rodsilvaviera2.ScreenshotGnome.png",
+        "install -Dm644 LICENSE /app/share/licenses/io.github.rodsilvaviera2.ScreenshotGnome/LICENSE"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://github.com/rodsilvavieira2/screenshot_gnome.git",
+          "tag": "v0.1.0",
+          "commit": "REPLACE_WITH_ACTUAL_COMMIT_HASH"
+        },
+        "cargo-sources.json"
+      ]
+    }
+  ]
+}

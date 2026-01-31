@@ -71,6 +71,34 @@ The binary will be located at `target/release/screenshot_gnome`.
 
 ## Installation
 
+### From Flathub (Recommended - Coming Soon)
+
+Once published on Flathub, you can install with:
+
+```bash
+flatpak install flathub io.github.rodsilvaviera2.ScreenshotGnome
+```
+
+Run the application:
+```bash
+flatpak run io.github.rodsilvaviera2.ScreenshotGnome
+```
+
+### Building Flatpak Locally
+
+You can build and install the Flatpak package locally:
+
+```bash
+# Install Flatpak Builder
+flatpak install -y flathub org.flatpak.Builder
+
+# Build and install
+flatpak run --command=flatpak-builder org.flatpak.Builder --user --install --force-clean build-dir io.github.rodsilvaviera2.ScreenshotGnome.json
+
+# Run the app
+flatpak run io.github.rodsilvaviera2.ScreenshotGnome
+```
+
 ### System-wide Installation (requires sudo)
 
 Install to `/usr/local` (recommended):
@@ -244,6 +272,57 @@ Built with:
 
 - **Issues**: https://github.com/yourusername/screenshot_gnome/issues
 - **Discussions**: https://github.com/yourusername/screenshot_gnome/discussions
+
+## Flatpak/Flathub
+
+This application is configured for distribution via Flathub. The following files are included for Flatpak packaging:
+
+- `io.github.rodsilvaviera2.ScreenshotGnome.json` - Flatpak manifest
+- `io.github.rodsilvaviera2.ScreenshotGnome.metainfo.xml` - AppStream metadata
+- `io.github.rodsilvaviera2.ScreenshotGnome.desktop` - Desktop entry
+- `cargo-sources.json` - Cargo dependencies for offline build
+- `flathub.json` - Flathub build configuration
+
+### Testing Flatpak Build Locally
+
+```bash
+# Install Flatpak Builder
+flatpak install -y flathub org.flatpak.Builder
+
+# Validate the metainfo file
+flatpak run --command=flatpak-builder-lint org.flatpak.Builder appstream io.github.rodsilvaviera2.ScreenshotGnome.metainfo.xml
+
+# Validate the manifest
+flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest io.github.rodsilvaviera2.ScreenshotGnome.json
+
+# Build and install locally
+flatpak run --command=flatpak-builder org.flatpak.Builder --user --install --force-clean build-dir io.github.rodsilvaviera2.ScreenshotGnome.json
+
+# Run the app
+flatpak run io.github.rodsilvaviera2.ScreenshotGnome
+
+# Validate the built repository (after build)
+flatpak run --command=flatpak-builder-lint org.flatpak.Builder repo build-dir/repo
+```
+
+### Submitting to Flathub
+
+To submit this application to Flathub:
+
+1. Create a git tag for the release (e.g., `v0.1.0`)
+2. Update the manifest with the correct commit hash
+3. Fork the [flathub/flathub](https://github.com/flathub/flathub) repository (uncheck "Copy the master branch only")
+4. Clone with the `new-pr` branch: `git clone --branch=new-pr git@github.com:YOUR_USERNAME/flathub.git`
+5. Create a submission branch: `git checkout -b screenshot-gnome-submission new-pr`
+6. Add only these files:
+   - `io.github.rodsilvaviera2.ScreenshotGnome.json`
+   - `cargo-sources.json`
+   - `flathub.json`
+7. Commit and push
+8. Open a PR against `flathub/flathub:new-pr` (NOT master!)
+9. Title: "Add io.github.rodsilvaviera2.ScreenshotGnome"
+
+For more details, see the [Flathub submission documentation](https://docs.flathub.org/docs/for-app-authors/submission).
 
 ## Roadmap
 

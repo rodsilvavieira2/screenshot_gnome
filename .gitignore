@@ -1,1 +1,6 @@
 /target
+
+# Flatpak build directories
+/build-dir
+/.flatpak-builder
+/repo
