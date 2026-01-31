@@ -80,13 +80,7 @@ pub fn build_ui(app: &adw::Application, start_mode: Option<CaptureMode>) {
             CaptureMode::Selection | CaptureMode::Screen => {
                 handlers::capture_screen_or_selection(
                     &state,
-                    &components.window,
-                    &components.header.header_bar,
-                    &components.toolbar.tools_box,
-                    &components.crop_toolbar.crop_tools_box,
-                    &components.selection_toolbar.selection_tools_box,
-                    &components.drawing.drawing_area,
-                    &components.drawing.placeholder_icon,
+                    &components,
                     mode,
                 );
             }

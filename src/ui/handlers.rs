@@ -413,26 +413,10 @@ pub fn connect_selection_handlers(state: &Rc<RefCell<AppState>>, components: &Ui
 pub fn connect_screenshot_handler(state: &Rc<RefCell<AppState>>, components: &UiComponents) {
     components.header.take_screenshot_btn.connect_clicked({
         let state = state.clone();
-        let window = components.window.clone();
-        let header_bar = components.header.header_bar.clone();
-        let tools_box = components.toolbar.tools_box.clone();
-        let crop_tools_box = components.crop_toolbar.crop_tools_box.clone();
-        let selection_tools_box = components.selection_toolbar.selection_tools_box.clone();
-        let drawing_area = components.drawing.drawing_area.clone();
-        let placeholder_icon = components.drawing.placeholder_icon.clone();
+        let components = components.clone();
         move |_| {
             let mode = state.borrow().mode;
-            capture_screen_or_selection(
-                &state,
-                &window,
-                &header_bar,
-                &tools_box,
-                &crop_tools_box,
-                &selection_tools_box,
-                &drawing_area,
-                &placeholder_icon,
-                mode,
-            );
+            capture_screen_or_selection(&state, &components, mode);
         }
     });
 }
@@ -443,16 +427,7 @@ pub fn connect_keyboard_handlers(state: &Rc<RefCell<AppState>>, components: &UiC
 
     key_controller.connect_key_pressed({
         let state = state.clone();
-        let drawing_area = components.drawing.drawing_area.clone();
-        let window = components.window.clone();
-        let header_bar = components.header.header_bar.clone();
-        let tools_box = components.toolbar.tools_box.clone();
-        let crop_tools_box = components.crop_toolbar.crop_tools_box.clone();
-        let selection_tools_box = components.selection_toolbar.selection_tools_box.clone();
-        let placeholder_icon = components.drawing.placeholder_icon.clone();
-        let mode_selection_btn = components.header.mode_selection_btn.clone();
-        let mode_window_btn = components.header.mode_window_btn.clone();
-        let mode_screen_btn = components.header.mode_screen_btn.clone();
+        let components = components.clone();
 
         move |_, key, _code, modifier| {
             let (action, _mode, _is_active) = {
@@ -464,15 +439,15 @@ pub fn connect_keyboard_handlers(state: &Rc<RefCell<AppState>>, components: &UiC
                 debug!("Shortcut detected: {:?}", action);
                 match action {
                     Action::Copy => {
-                        perform_copy(&state, &window);
+                        perform_copy(&state, &components.window);
                         return glib::Propagation::Stop;
                     }
                     Action::Save => {
-                        perform_save(state.clone(), window.clone());
+                        perform_save(state.clone(), components.window.clone());
                         return glib::Propagation::Stop;
                     }
                     Action::Undo => {
-                        perform_undo(&state, &drawing_area);
+                        perform_undo(&state, &components.drawing.drawing_area);
                         return glib::Propagation::Stop;
                     }
                     Action::Cancel => {
@@ -480,23 +455,23 @@ pub fn connect_keyboard_handlers(state: &Rc<RefCell<AppState>>, components: &UiC
                         if s.is_active && s.mode == CaptureMode::Selection {
                             debug!("Canceling selection via shortcut");
                             s.exit_capture_mode();
-                            window.unfullscreen();
-                            header_bar.set_visible(true);
-                            tools_box.set_visible(s.final_image.is_some());
-                            crop_tools_box.set_visible(false);
-                            selection_tools_box.set_visible(false);
+                            components.window.unfullscreen();
+                            components.header.header_bar.set_visible(true);
+                            components.toolbar.tools_box.set_visible(s.final_image.is_some());
+                            components.crop_toolbar.crop_tools_box.set_visible(false);
+                            components.selection_toolbar.selection_tools_box.set_visible(false);
                             if s.final_image.is_none() {
-                                placeholder_icon.set_visible(true);
+                                components.drawing.placeholder_icon.set_visible(true);
                             }
                             drop(s);
-                            drawing_area.queue_draw();
+                            components.drawing.drawing_area.queue_draw();
                             return glib::Propagation::Stop;
                         } else if s.is_crop_mode {
                             s.exit_crop_mode();
                             drop(s);
-                            crop_tools_box.set_visible(false);
-                            tools_box.set_visible(true);
-                            drawing_area.queue_draw();
+                            components.crop_toolbar.crop_tools_box.set_visible(false);
+                            components.toolbar.tools_box.set_visible(true);
+                            components.drawing.drawing_area.queue_draw();
                             return glib::Propagation::Stop;
                         }
                     }
@@ -505,14 +480,14 @@ pub fn connect_keyboard_handlers(state: &Rc<RefCell<AppState>>, components: &UiC
                         if s.is_active && s.mode == CaptureMode::Selection {
                             if confirm_selection(
                                 &mut s,
-                                &window,
-                                &header_bar,
-                                &tools_box,
-                                &crop_tools_box,
+                                &components.window,
+                                &components.header.header_bar,
+                                &components.toolbar.tools_box,
+                                &components.crop_toolbar.crop_tools_box,
                             ) {
-                                selection_tools_box.set_visible(false);
+                                components.selection_toolbar.selection_tools_box.set_visible(false);
                                 drop(s);
-                                drawing_area.queue_draw();
+                                components.drawing.drawing_area.queue_draw();
                             }
                             return glib::Propagation::Stop;
                         }
@@ -521,28 +496,28 @@ pub fn connect_keyboard_handlers(state: &Rc<RefCell<AppState>>, components: &UiC
                         let mut s = state.borrow_mut();
                         s.editor.set_tool(EditorTool::Pointer);
                         drop(s);
-                        drawing_area.queue_draw();
+                        components.drawing.drawing_area.queue_draw();
                         return glib::Propagation::Stop;
                     }
                     Action::ToolPencil => {
                         let mut s = state.borrow_mut();
                         s.editor.set_tool(EditorTool::Pencil);
                         drop(s);
-                        drawing_area.queue_draw();
+                        components.drawing.drawing_area.queue_draw();
                         return glib::Propagation::Stop;
                     }
                     Action::ToolRectangle => {
                         let mut s = state.borrow_mut();
                         s.editor.set_tool(EditorTool::Rectangle);
                         drop(s);
-                        drawing_area.queue_draw();
+                        components.drawing.drawing_area.queue_draw();
                         return glib::Propagation::Stop;
                     }
                     Action::ToolText => {
                         let mut s = state.borrow_mut();
                         s.editor.set_tool(EditorTool::Text);
                         drop(s);
-                        drawing_area.queue_draw();
+                        components.drawing.drawing_area.queue_draw();
                         return glib::Propagation::Stop;
                     }
                     Action::ToolCrop => {
@@ -550,44 +525,34 @@ pub fn connect_keyboard_handlers(state: &Rc<RefCell<AppState>>, components: &UiC
                         if s.final_image.is_some() {
                             s.is_crop_mode = true;
                             s.editor.set_tool(EditorTool::Crop);
-                            tools_box.set_visible(false);
-                            crop_tools_box.set_visible(true);
+                            components.toolbar.tools_box.set_visible(false);
+                            components.crop_toolbar.crop_tools_box.set_visible(true);
                             drop(s);
-                            drawing_area.queue_draw();
+                            components.drawing.drawing_area.queue_draw();
                             return glib::Propagation::Stop;
                         }
                     }
                     Action::SwitchToSelection => {
                         let mut s = state.borrow_mut();
                         s.mode = CaptureMode::Selection;
-                        mode_selection_btn.set_active(true);
+                        components.header.mode_selection_btn.set_active(true);
                         return glib::Propagation::Stop;
                     }
                     Action::SwitchToWindow => {
                         let mut s = state.borrow_mut();
                         s.mode = CaptureMode::Window;
-                        mode_window_btn.set_active(true);
+                        components.header.mode_window_btn.set_active(true);
                         return glib::Propagation::Stop;
                     }
                     Action::SwitchToScreen => {
                         let mut s = state.borrow_mut();
                         s.mode = CaptureMode::Screen;
-                        mode_screen_btn.set_active(true);
+                        components.header.mode_screen_btn.set_active(true);
                         return glib::Propagation::Stop;
                     }
                     Action::TakeScreenshot => {
                         let mode = state.borrow().mode;
-                        capture_screen_or_selection(
-                            &state,
-                            &window,
-                            &header_bar,
-                            &tools_box,
-                            &crop_tools_box,
-                            &selection_tools_box,
-                            &drawing_area,
-                            &placeholder_icon,
-                            mode,
-                        );
+                        capture_screen_or_selection(&state, &components, mode);
                         return glib::Propagation::Stop;
                     }
                 }
@@ -601,17 +566,25 @@ pub fn connect_keyboard_handlers(state: &Rc<RefCell<AppState>>, components: &UiC
 
 pub fn capture_screen_or_selection(
     state: &Rc<RefCell<AppState>>,
-    window: &adw::ApplicationWindow,
-    header_bar: &adw::HeaderBar,
-    tools_box: &gtk::Box,
-    crop_tools_box: &gtk::Box,
-    selection_tools_box: &gtk::Box,
-    drawing_area: &gtk::DrawingArea,
-    placeholder_icon: &gtk::Image,
+    components: &UiComponents,
     mode: CaptureMode,
 ) {
+    let window = &components.window;
+    let header_bar = &components.header.header_bar;
+    let tools_box = &components.toolbar.tools_box;
+    let crop_tools_box = &components.crop_toolbar.crop_tools_box;
+    let selection_tools_box = &components.selection_toolbar.selection_tools_box;
+    let drawing_area = &components.drawing.drawing_area;
+    let placeholder_icon = &components.drawing.placeholder_icon;
+
     if mode == CaptureMode::Window {
-        show_window_selector(state, window, drawing_area, placeholder_icon, tools_box);
+        show_window_selector(
+            state,
+            window,
+            drawing_area,
+            placeholder_icon,
+            tools_box,
+        );
         return;
     }
 
