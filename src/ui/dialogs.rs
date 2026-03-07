@@ -26,13 +26,13 @@ pub fn create_text_popover(drawing_area: &gtk::DrawingArea) -> TextPopoverCompon
         .build();
 
     let text_confirm_btn = gtk::Button::builder()
-        .icon_name("object-select-symbolic")
+        .icon_name("app-object-select-symbolic")
         .tooltip_text("Add Text")
         .build();
     text_confirm_btn.add_css_class("suggested-action");
 
     let text_cancel_btn = gtk::Button::builder()
-        .icon_name("process-stop-symbolic")
+        .icon_name("app-process-stop-symbolic")
         .tooltip_text("Cancel")
         .build();
 
