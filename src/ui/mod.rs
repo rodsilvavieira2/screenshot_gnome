@@ -16,8 +16,29 @@ use std::rc::Rc;
 
 use crate::app::{AppState, CaptureMode};
 
+fn load_custom_css() {
+    let provider = gtk::CssProvider::new();
+    provider.load_from_string("
+        .custom-toolbar {
+            background-color: @window_bg_color;
+            border: 1px solid @borders;
+            border-radius: 12px;
+            padding: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+    ");
+    if let Some(display) = gtk::gdk::Display::default() {
+        gtk::style_context_add_provider_for_display(
+            &display,
+            &provider,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
+    }
+}
+
 pub fn build_ui(app: &adw::Application, start_mode: Option<CaptureMode>) {
     info!("Building UI...");
+    load_custom_css();
     let state = Rc::new(RefCell::new(AppState::new()));
 
     let header = header::create_header_bar(&state);

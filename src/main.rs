@@ -13,6 +13,11 @@ const APP_ID: &str = "org.example.ScreenshotGnome";
 
 fn main() {
     env_logger::init();
+    
+    let bytes = gtk4::glib::Bytes::from_static(include_bytes!("resources.gresource"));
+    let resource = gtk4::gio::Resource::from_data(&bytes).unwrap();
+    gtk4::gio::resources_register(&resource);
+
     let args: Vec<String> = std::env::args().collect();
 
     let start_mode =
@@ -27,6 +32,13 @@ fn main() {
         };
 
     let app = adw::Application::builder().application_id(APP_ID).build();
+
+    app.connect_startup(|_| {
+        if let Some(display) = gtk4::gdk::Display::default() {
+            let icon_theme = gtk4::IconTheme::for_display(&display);
+            icon_theme.add_resource_path("/org/example/ScreenshotGnome/icons");
+        }
+    });
 
     app.connect_activate(move |app| {
         ui::build_ui(app, start_mode);

@@ -52,42 +52,42 @@ pub fn create_toolbar(state: &Rc<RefCell<AppState>>) -> ToolbarComponents {
     connect_color_button(state, &color_button, &color_picker_circle);
 
     let tool_pointer_btn = gtk::ToggleButton::builder()
-        .icon_name("input-mouse-symbolic")
+        .icon_name("app-tool-pointer-symbolic")
         .tooltip_text("Pointer")
         .active(true)
         .build();
     tool_pointer_btn.add_css_class("flat");
 
     let tool_pencil_btn = gtk::ToggleButton::builder()
-        .icon_name("document-edit-symbolic")
+        .icon_name("app-tool-pencil-symbolic")
         .tooltip_text("Free Draw")
         .group(&tool_pointer_btn)
         .build();
     tool_pencil_btn.add_css_class("flat");
 
     let tool_rectangle_btn = gtk::ToggleButton::builder()
-        .icon_name("media-playback-stop-symbolic")
+        .icon_name("app-tool-rectangle-symbolic")
         .tooltip_text("Rectangle")
         .group(&tool_pointer_btn)
         .build();
     tool_rectangle_btn.add_css_class("flat");
 
     let tool_crop_btn = gtk::ToggleButton::builder()
-        .icon_name("crop-symbolic")
+        .icon_name("app-tool-crop-symbolic")
         .tooltip_text("Crop")
         .group(&tool_pointer_btn)
         .build();
     tool_crop_btn.add_css_class("flat");
 
     let tool_text_btn = gtk::ToggleButton::builder()
-        .icon_name("insert-text-symbolic")
+        .icon_name("app-tool-text-symbolic")
         .tooltip_text("Add Text")
         .group(&tool_pointer_btn)
         .build();
     tool_text_btn.add_css_class("flat");
 
     let tool_color_picker_btn = gtk::ToggleButton::builder()
-        .icon_name("color-select-symbolic")
+        .icon_name("app-tool-color-picker-symbolic")
         .tooltip_text("Pick Color")
         .group(&tool_pointer_btn)
         .build();
@@ -109,19 +109,19 @@ pub fn create_toolbar(state: &Rc<RefCell<AppState>>) -> ToolbarComponents {
     tool_buttons_box.append(&color_button);
 
     let undo_btn = gtk::Button::builder()
-        .icon_name("edit-undo-symbolic")
+        .icon_name("app-edit-undo-symbolic")
         .tooltip_text("Undo")
         .build();
     undo_btn.add_css_class("flat");
 
     let copy_btn = gtk::Button::builder()
-        .icon_name("edit-copy-symbolic")
+        .icon_name("app-edit-copy-symbolic")
         .tooltip_text("Copy to Clipboard")
         .build();
     copy_btn.add_css_class("flat");
 
     let save_btn = gtk::Button::builder()
-        .icon_name("document-save-symbolic")
+        .icon_name("app-document-save-symbolic")
         .tooltip_text("Save")
         .build();
     save_btn.add_css_class("suggested-action");
@@ -133,7 +133,7 @@ pub fn create_toolbar(state: &Rc<RefCell<AppState>>) -> ToolbarComponents {
         .valign(Align::End)
         .margin_bottom(24)
         .build();
-    tools_box.add_css_class("osd");
+    tools_box.add_css_class("custom-toolbar");
     tools_box.add_css_class("toolbar");
 
     tools_box.append(&tool_buttons_box);
@@ -166,17 +166,17 @@ pub fn create_crop_toolbar() -> CropToolbarComponents {
         .margin_bottom(24)
         .visible(false)
         .build();
-    crop_tools_box.add_css_class("osd");
+    crop_tools_box.add_css_class("custom-toolbar");
     crop_tools_box.add_css_class("toolbar");
 
     let cancel_btn = gtk::Button::builder()
-        .icon_name("process-stop-symbolic")
+        .icon_name("app-process-stop-symbolic")
         .tooltip_text("Cancel")
         .build();
     cancel_btn.add_css_class("destructive-action");
 
     let confirm_btn = gtk::Button::builder()
-        .icon_name("object-select-symbolic")
+        .icon_name("app-object-select-symbolic")
         .tooltip_text("Confirm")
         .build();
     confirm_btn.add_css_class("suggested-action");
@@ -200,17 +200,17 @@ pub fn create_selection_toolbar() -> SelectionToolbarComponents {
         .margin_bottom(24)
         .visible(false)
         .build();
-    selection_tools_box.add_css_class("osd");
+    selection_tools_box.add_css_class("custom-toolbar");
     selection_tools_box.add_css_class("toolbar");
 
     let cancel_btn = gtk::Button::builder()
-        .icon_name("process-stop-symbolic")
+        .icon_name("app-process-stop-symbolic")
         .tooltip_text("Cancel")
         .build();
     cancel_btn.add_css_class("destructive-action");
 
     let confirm_btn = gtk::Button::builder()
-        .icon_name("object-select-symbolic")
+        .icon_name("app-object-select-symbolic")
         .tooltip_text("Confirm")
         .build();
     confirm_btn.add_css_class("suggested-action");
