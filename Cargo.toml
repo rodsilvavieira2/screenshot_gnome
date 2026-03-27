@@ -7,6 +7,6 @@ edition = "2021"
 gtk4 = { version = "0.10.3", features = ["v4_12"] }
 image = "0.25.9"
 libadwaita = { version = "0.8.1", features = ["v1_5"] }
-xcap = "0.8.0"
+xcap = "0.9.3"
 log = "0.4"
 env_logger = "0.11"
